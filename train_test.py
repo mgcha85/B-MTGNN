@@ -553,19 +553,6 @@ def train(data, X, Y, model, criterion, optim, batch_size):
     return total_loss / n_samples
 
 
-def resolve_device(dev_str: str) -> torch.device:
-    dev_str = dev_str.lower()
-    if dev_str == 'auto':
-        return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    if dev_str.startswith('cuda'):
-        if torch.cuda.is_available():
-            return torch.device(dev_str)  # 'cuda' or 'cuda:0' 등
-        else:
-            print("[warn] CUDA requested but not available. Falling back to CPU.")
-            return torch.device('cpu')
-    return torch.device('cpu')
-
-
 def set_random_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -579,6 +566,54 @@ def set_random_seed(seed):
 # 어디서든 쓸 수 있게
 def current_device_of_model(model):
     return next(model.parameters()).device
+
+def resolve_device(dev_str: str) -> torch.device:
+    dev_str = (dev_str or "").lower().strip()
+
+    # 1) 자동 선택
+    if dev_str in ("", "auto"):
+        return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # 2) CPU 강제
+    if dev_str == "cpu":
+        return torch.device("cpu")
+
+    # 3) CUDA 계열
+    if dev_str.startswith("cuda"):
+        if not torch.cuda.is_available():
+            print("[warn] CUDA requested but not available. Falling back to CPU.")
+            return torch.device("cpu")
+
+        # 'cuda'만 주면 0번으로
+        if dev_str == "cuda":
+            return torch.device("cuda:0")
+
+        # 'cuda:<idx>' 파싱
+        parts = dev_str.split(":")
+        if len(parts) == 2:
+            try:
+                idx = int(parts[1])
+            except ValueError:
+                print(f"[warn] Invalid CUDA device spec '{dev_str}'. Falling back to cuda:0.")
+                idx = 0
+        else:
+            idx = 0
+
+        count = torch.cuda.device_count()
+        if idx < 0 or idx >= count:
+            if count > 0:
+                print(f"[warn] Requested {dev_str} but only {count} CUDA device(s) available. Using cuda:0 instead.")
+                return torch.device("cuda:0")
+            else:
+                print("[warn] No CUDA devices available. Falling back to CPU.")
+                return torch.device("cpu")
+
+        return torch.device(f"cuda:{idx}")
+
+    # 4) 그 외 문자열은 CPU로
+    print(f"[warn] Unknown device '{dev_str}'. Using CPU.")
+    return torch.device("cpu")
+
 
 def main(experiment):
     # Set fixed random seed for reproducibility
