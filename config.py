@@ -19,7 +19,7 @@ def _str2bool(v: Any) -> bool:
 @dataclass
 class Config:
     # === defaults (현재 코드와 동일) ===
-    data: str = "./data/Smoothed_CyberTrend_Forecasting_All.txt"
+    data: str = "./data/Smoothed_CyberTrend_Forecasting_All.csv"
     log_interval: int = 2000
     save: str = "model/Bayesian/model.safetensors"
     optim: str = "adam"
