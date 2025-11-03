@@ -57,7 +57,7 @@ class Config:
     num_split: int = 1
     step_size: int = 100
 
-    search_iters: int = 60
+    search_iters: int = 1 # 60
     train_ratio: float = 0.43
     valid_ratio: float = 0.30
     hp_path: str = "model/Bayesian/hp.txt"

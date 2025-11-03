@@ -134,7 +134,7 @@ def generate_month_labels(start: str, end: str):
 #plots predicted curve with actual curve. The x axis can be adjusted as needed
 def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95):
 
-    M = generate_month_labels("Jul-11", "Dec-22")
+    M = generate_month_labels("Jul-11", "Dec-24")
 
     M2=[]
     p=[]
@@ -771,7 +771,15 @@ def main(experiment):
 
     # Load the best saved model.
     state_dict = load_file(args.save)
-    model.load_state_dict(state_dict).to(device) 
+    ret = model.load_state_dict(state_dict, strict=True)  # or strict=False
+    # 3) 로드 결과 점검(선택)
+    if hasattr(ret, "missing_keys") and ret.missing_keys:
+        print("[load_state_dict] missing keys:", ret.missing_keys)
+    if hasattr(ret, "unexpected_keys") and ret.unexpected_keys:
+        print("[load_state_dict] unexpected keys:", ret.unexpected_keys)
+
+    # 4) 모델을 디바이스로 이동
+    model = model.to(device)
 
     vtest_acc, vtest_rae, vtest_corr, vtest_smape = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1,
                                          args.batch_size, True)
