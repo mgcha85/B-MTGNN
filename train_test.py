@@ -14,8 +14,6 @@ import time
 from safetensors.torch import save_file, load_file
 import pandas as pd
 
-plt.rcParams['savefig.dpi'] = 1200
-
 
 def inverse_diff_2d(output, I,shift):
     output[0,:]=torch.exp(output[0,:]+torch.log(I+shift))-shift
@@ -161,7 +159,10 @@ def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95
     plt.plot(x,actual,'b-',label='Actual')
     plt.plot(x,predicted,'--', color='purple',label='Predicted')
     # Plot the confidence interval as a shaded region
-    plt.fill_between(x, predicted-confidence_95.numpy(), predicted+confidence_95.numpy(), alpha=0.5, color='pink', label='95% Confidence')
+    # plt.fill_between(x, predicted-confidence_95.numpy(), predicted+confidence_95.numpy(), alpha=0.5, color='pink', label='95% Confidence')
+    conf = confidence_95.detach().cpu().numpy() if torch.is_tensor(confidence_95) else confidence_95
+    plt.fill_between(x, predicted - conf, predicted + conf, alpha=0.5, color='pink', label='95% Confidence')
+
     plt.legend(loc="best",prop={'size': 11})
     plt.axis('tight')
     plt.grid(True)
@@ -174,7 +175,7 @@ def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95
     fig = plt.gcf()
     title=title.replace('/','_')
     plt.savefig('model/Bayesian/'+type+'/'+title+'_'+type+'.png', bbox_inches="tight")
-    plt.savefig('model/Bayesian/'+type+'/'+title+'_'+type+".pdf", bbox_inches = "tight", format='pdf')
+    plt.savefig('model/Bayesian/'+type+'/'+title+'_'+type+".pdf", bbox_inches="tight", format='pdf')
 
     plt.show(block=False)
     plt.pause(2)
@@ -193,7 +194,7 @@ def s_mape(yTrue,yPred):
 #for testing the model on unseen data, a sliding window can be used when the output period of the model is smaller than the target period to be forecasted.
 #The sliding window uses the output from previous step as input of the next step.
 #In our case, the window was not slided (we predicted 36 months and the model by default predicts 36 months)
-def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_input, is_plot):
+def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_input, is_plot, z=1.96):
     #model.eval()# To get Bayesian estimation, we must comment out this line
     total_loss = 0
     total_loss_l1 = 0
@@ -222,7 +223,7 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
         X = torch.unsqueeze(x_input,dim=0)
         X = torch.unsqueeze(X,dim=1)
         X = X.transpose(2,3)
-        X = X.to(torch.float)
+        X = X.to(torch.float).to(device)
 
 
         y_true = test_window[i: i+data.out_len,:].clone() 
@@ -254,10 +255,7 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
         std_dev = torch.std(outputs, dim=0)#standard deviation
 
         # Calculate 95% confidence interval
-        z=1.96
-        confidence=z*std_dev/torch.sqrt(torch.tensor(num_runs))
-
-
+        confidence = z*std_dev/torch.sqrt(torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype))
 
         #shift the sliding window
         if data.P<=data.out_len:
@@ -359,7 +357,7 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
 
 
 
-def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot):
+def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1.96):
     #model.eval()# To get Bayesian estimation, we must comment out this line
     total_loss = 0
     total_loss_l1 = 0
@@ -374,6 +372,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot):
     print('validation r=',str(r))
 
     for X, Y in data.get_batches(X, Y, batch_size, False):
+        X = X.to(device)
         X = torch.unsqueeze(X,dim=1)
         X = X.transpose(2,3)
 
@@ -402,8 +401,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot):
         std_dev = torch.std(outputs, dim=0)#standard deviation
 
         # Calculate 95% confidence interval
-        z=1.96
-        confidence=z*std_dev/torch.sqrt(torch.tensor(num_runs))
+        confidence = z*std_dev/torch.sqrt(torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype))
 
         output=mean #we will consider the mean to be the prediction
 
@@ -542,74 +540,28 @@ def train(data, X, Y, model, criterion, optim, batch_size):
     return total_loss / n_samples
 
 
-parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
-parser.add_argument('--data', type=str, default='./data/Smoothed_CyberTrend_Forecasting_All.txt',
-                    help='location of the data file')
-parser.add_argument('--log_interval', type=int, default=2000, metavar='N',
-                    help='report interval')
-parser.add_argument('--save', type=str, default='model/Bayesian/model.safetensors',
-                    help='path to save the final model')
-parser.add_argument('--optim', type=str, default='adam')
-parser.add_argument('--L1Loss', type=bool, default=True)
-parser.add_argument('--normalize', type=int, default=2)
-parser.add_argument('--device',type=str,default='cuda:1',help='')
-parser.add_argument('--gcn_true', type=bool, default=True, help='whether to add graph convolution layer')
-parser.add_argument('--buildA_true', type=bool, default=True, help='whether to construct adaptive adjacency matrix')
-parser.add_argument('--gcn_depth',type=int,default=2,help='graph convolution depth')
-parser.add_argument('--num_nodes',type=int,default=142,help='number of nodes/variables')
-parser.add_argument('--dropout',type=float,default=0.3,help='dropout rate')
-parser.add_argument('--subgraph_size',type=int,default=20,help='k')
-parser.add_argument('--node_dim',type=int,default=40,help='dim of nodes')
-parser.add_argument('--dilation_exponential',type=int,default=2,help='dilation exponential')
-parser.add_argument('--conv_channels',type=int,default=16,help='convolution channels')
-parser.add_argument('--residual_channels',type=int,default=16,help='residual channels')
-parser.add_argument('--skip_channels',type=int,default=32,help='skip channels')
-parser.add_argument('--end_channels',type=int,default=64,help='end channels')
-parser.add_argument('--in_dim',type=int,default=1,help='inputs dimension')
-parser.add_argument('--seq_in_len',type=int,default=10,help='input sequence length')
-parser.add_argument('--seq_out_len',type=int,default=36,help='output sequence length')
-parser.add_argument('--horizon', type=int, default=1) 
-parser.add_argument('--layers',type=int,default=5,help='number of layers')
+def resolve_device(dev_str: str) -> torch.device:
+    dev_str = dev_str.lower()
+    if dev_str == 'auto':
+        return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    if dev_str.startswith('cuda'):
+        if torch.cuda.is_available():
+            return torch.device(dev_str)  # 'cuda' or 'cuda:0' 등
+        else:
+            print("[warn] CUDA requested but not available. Falling back to CPU.")
+            return torch.device('cpu')
+    return torch.device('cpu')
 
-parser.add_argument('--batch_size',type=int,default=8,help='batch size')
-parser.add_argument('--lr',type=float,default=0.001,help='learning rate')
-parser.add_argument('--weight_decay',type=float,default=0.00001,help='weight decay rate')
-
-parser.add_argument('--clip',type=int,default=10,help='clip')
-
-parser.add_argument('--propalpha',type=float,default=0.05,help='prop alpha')
-parser.add_argument('--tanhalpha',type=float,default=3,help='tanh alpha')
-
-parser.add_argument('--epochs',type=int,default=200,help='')
-parser.add_argument('--num_split',type=int,default=1,help='number of splits for graphs')
-parser.add_argument('--step_size',type=int,default=100,help='step_size')
-
-parser.add_argument('--search_iters', type=int, default=60,
-                    help='number of random search iterations (default: 60)')
-parser.add_argument('--train_ratio', type=float, default=0.43,
-                    help='training split ratio (default: 0.43)')
-parser.add_argument('--valid_ratio', type=float, default=0.30,
-                    help='validation split ratio (default: 0.30)')
-parser.add_argument('--hp_path', type=str, default='model/Bayesian/hp.txt',
-                    help='path to save best hyperparameters (default: model/Bayesian/hp.txt)')
-
-args = parser.parse_args()
-if args.train_ratio + args.valid_ratio > 1.0:
-    raise ValueError(f"train_ratio + valid_ratio must be <= 1.0 "
-                     f"(got {args.train_ratio + args.valid_ratio})")
-
-device = torch.device('cpu')
-torch.set_num_threads(3)
 
 def set_random_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
-fixed_seed = 123
 
 def main(experiment):
     # Set fixed random seed for reproducibility
@@ -685,7 +637,7 @@ def main(experiment):
                     conv_channels=conv, residual_channels=res,
                     skip_channels=skip, end_channels= end,
                     seq_length=args.seq_in_len, in_dim=args.in_dim, out_dim=args.seq_out_len,
-                    layers=layer, propalpha=prop_alpha, tanhalpha=tanh_alpha, layer_norm_affline=False)
+                    layers=layer, propalpha=prop_alpha, tanhalpha=tanh_alpha, layer_norm_affline=False).to(device)
         
 
         print(args)
@@ -767,7 +719,7 @@ def main(experiment):
 
     # Load the best saved model.
     state_dict = load_file(args.save)
-    model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict).to(device) 
 
     vtest_acc, vtest_rae, vtest_corr, vtest_smape = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1,
                                          args.batch_size, True)
@@ -780,7 +732,71 @@ def main(experiment):
     return vtest_acc, vtest_rae, vtest_corr, vtest_smape, test_acc, test_rae, test_corr, test_smape
 
 
+plt.rcParams['savefig.dpi'] = 1200
+
+parser = argparse.ArgumentParser(description='PyTorch Time series forecasting')
+parser.add_argument('--data', type=str, default='./data/Smoothed_CyberTrend_Forecasting_All.txt',
+                    help='location of the data file')
+parser.add_argument('--log_interval', type=int, default=2000, metavar='N',
+                    help='report interval')
+parser.add_argument('--save', type=str, default='model/Bayesian/model.safetensors',
+                    help='path to save the final model')
+parser.add_argument('--optim', type=str, default='adam')
+parser.add_argument('--L1Loss', type=bool, default=True)
+parser.add_argument('--normalize', type=int, default=2)
+parser.add_argument('--device',type=str,default='cuda:1',help='')
+parser.add_argument('--gcn_true', type=bool, default=True, help='whether to add graph convolution layer')
+parser.add_argument('--buildA_true', type=bool, default=True, help='whether to construct adaptive adjacency matrix')
+parser.add_argument('--gcn_depth',type=int,default=2,help='graph convolution depth')
+parser.add_argument('--num_nodes',type=int,default=142,help='number of nodes/variables')
+parser.add_argument('--dropout',type=float,default=0.3,help='dropout rate')
+parser.add_argument('--subgraph_size',type=int,default=20,help='k')
+parser.add_argument('--node_dim',type=int,default=40,help='dim of nodes')
+parser.add_argument('--dilation_exponential',type=int,default=2,help='dilation exponential')
+parser.add_argument('--conv_channels',type=int,default=16,help='convolution channels')
+parser.add_argument('--residual_channels',type=int,default=16,help='residual channels')
+parser.add_argument('--skip_channels',type=int,default=32,help='skip channels')
+parser.add_argument('--end_channels',type=int,default=64,help='end channels')
+parser.add_argument('--in_dim',type=int,default=1,help='inputs dimension')
+parser.add_argument('--seq_in_len',type=int,default=10,help='input sequence length')
+parser.add_argument('--seq_out_len',type=int,default=36,help='output sequence length')
+parser.add_argument('--horizon', type=int, default=1) 
+parser.add_argument('--layers',type=int,default=5,help='number of layers')
+
+parser.add_argument('--batch_size',type=int,default=8,help='batch size')
+parser.add_argument('--lr',type=float,default=0.001,help='learning rate')
+parser.add_argument('--weight_decay',type=float,default=0.00001,help='weight decay rate')
+
+parser.add_argument('--clip',type=int,default=10,help='clip')
+
+parser.add_argument('--propalpha',type=float,default=0.05,help='prop alpha')
+parser.add_argument('--tanhalpha',type=float,default=3,help='tanh alpha')
+
+parser.add_argument('--epochs',type=int,default=200,help='')
+parser.add_argument('--num_split',type=int,default=1,help='number of splits for graphs')
+parser.add_argument('--step_size',type=int,default=100,help='step_size')
+
+parser.add_argument('--search_iters', type=int, default=60,
+                    help='number of random search iterations (default: 60)')
+parser.add_argument('--train_ratio', type=float, default=0.43,
+                    help='training split ratio (default: 0.43)')
+parser.add_argument('--valid_ratio', type=float, default=0.30,
+                    help='validation split ratio (default: 0.30)')
+parser.add_argument('--hp_path', type=str, default='model/Bayesian/hp.txt',
+                    help='path to save best hyperparameters (default: model/Bayesian/hp.txt)')
+
+args = parser.parse_args()
+if args.train_ratio + args.valid_ratio > 1.0:
+    raise ValueError(f"train_ratio + valid_ratio must be <= 1.0 "
+                    f"(got {args.train_ratio + args.valid_ratio})")
+
+fixed_seed = 123
+device = resolve_device(args.device)
+torch.set_num_threads(3)
+
+
 if __name__ == "__main__":
+
     vacc = []
     vrae = []
     vcorr = []
