@@ -136,36 +136,28 @@ def generate_month_labels(start: str, end: str):
 #plots predicted curve with actual curve. The x axis can be adjusted as needed
 def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95):
 
-    M = generate_month_labels("Jul-11", "Dec-23")
-
-    #all months
-    months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    M_=[]
-    for year in range (11,23):   
-        for month in months:
-            if year==11 and month not in ['Jul','Aug','Sep','Oct','Nov','Dec']:
-                continue
-            M_.append(month+'-'+str(year))   
+    M = generate_month_labels("Jul-11", "Dec-22")
 
     M2=[]
     p=[]
 
+    len_pred = len(predicted)
     #last 3 years
     if type=='Testing':
-        M=M[-len(predicted):]
+        M=M[-len_pred:]
         for index,value in enumerate(M):
-            if 'Dec' in M[index] or 'Mar' in M[index] or 'Jun' in M[index] or 'Sep' in M[index]:
-                M2.append(M[index])
+            if 'Dec' in value or 'Mar' in value or 'Jun' in value or 'Sep' in value:
+                M2.append(value)
                 p.append(index+1) 
     
-    else: ##Validation x axis: Oct-16 to Sep-19
-        M=M[63:99]
+    else: ## last 3 years before Test data
+        M=M[-2*len_pred:-len_pred]
         for index,value in enumerate(M):
-            if 'Dec' in M[index] or 'Mar' in M[index] or 'Jun' in M[index] or 'Sep' in M[index]:
-                M2.append(M[index])
+            if 'Dec' in value or 'Mar' in value or 'Jun' in value or 'Sep' in value:
+                M2.append(value)
                 p.append(index+1) 
 
-    x=range(1,len(predicted)+1)
+    x=range(1,len_pred+1)
     plt.plot(x,actual,'b-',label='Actual')
     plt.plot(x,predicted,'--', color='purple',label='Predicted')
     # Plot the confidence interval as a shaded region
