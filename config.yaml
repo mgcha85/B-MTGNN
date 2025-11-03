@@ -5,7 +5,7 @@ save: "model/Bayesian/model.safetensors"
 optim: "adam"
 L1Loss: true
 normalize: 2
-device: "cuda:1"
+device: "cuda:0"
 
 gcn_true: true
 buildA_true: true
