@@ -43,3 +43,4 @@ Below is an example for the past and predicted future data for the Password Atta
 2. arguments에서 받아서 처리
 3. 연월 만드는 함수 추가
 4. device GPU 선택 할 수 있도록
+5. `config.py`를 추가 (아직 `config.yaml`을 아직 사용안함)
