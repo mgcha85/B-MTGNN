@@ -155,14 +155,15 @@ def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95
                 M2.append(value)
                 p.append(index+1) 
 
-    x=range(1,len_pred+1)
-    plt.plot(x,actual,'b-',label='Actual')
-    plt.plot(x,predicted,'--', color='purple',label='Predicted')
-    # Plot the confidence interval as a shaded region
-    # plt.fill_between(x, predicted-confidence_95.numpy(), predicted+confidence_95.numpy(), alpha=0.5, color='pink', label='95% Confidence')
-    conf = confidence_95.detach().cpu().numpy() if torch.is_tensor(confidence_95) else confidence_95
-    plt.fill_between(x, predicted - conf, predicted + conf, alpha=0.5, color='pink', label='95% Confidence')
+    pred_np = predicted.detach().cpu().numpy() if torch.is_tensor(predicted) else predicted
+    act_np  = actual.detach().cpu().numpy() if torch.is_tensor(actual) else actual
+    conf_np = confidence_95.detach().cpu().numpy() if torch.is_tensor(confidence_95) else confidence_95
 
+    x = range(1, len(pred_np)+1)
+    plt.plot(x, act_np, 'b-', label='Actual')
+    plt.plot(x, pred_np, '--', color='purple', label='Predicted')
+    plt.fill_between(x, pred_np - conf_np, pred_np + conf_np, alpha=0.5, color='pink', label='95% Confidence')
+    
     plt.legend(loc="best",prop={'size': 11})
     plt.axis('tight')
     plt.grid(True)
@@ -195,6 +196,9 @@ def s_mape(yTrue,yPred):
 #The sliding window uses the output from previous step as input of the next step.
 #In our case, the window was not slided (we predicted 36 months and the model by default predicts 36 months)
 def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_input, is_plot, z=1.96):
+    dev = current_device_of_model(model)
+    test_window = test_window.to(dev)
+
     #model.eval()# To get Bayesian estimation, we must comment out this line
     total_loss = 0
     total_loss_l1 = 0
@@ -223,10 +227,11 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
         X = torch.unsqueeze(x_input,dim=0)
         X = torch.unsqueeze(X,dim=1)
         X = X.transpose(2,3)
-        X = X.to(torch.float).to(device)
+        X = X.to(torch.float).to(dev)
 
 
-        y_true = test_window[i: i+data.out_len,:].clone() 
+        y_true = test_window[i:i+data.out_len, :].clone().to(dev)  # ★ 타깃 정렬
+
 
 
         # Bayesian estimation
@@ -255,13 +260,15 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
         std_dev = torch.std(outputs, dim=0)#standard deviation
 
         # Calculate 95% confidence interval
-        confidence = z*std_dev/torch.sqrt(torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype))
-
+        confidence = z * std_dev / torch.sqrt(
+            torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype)  # ★ 상수 정렬
+        )
         #shift the sliding window
-        if data.P<=data.out_len:
-            x_input = y_pred[-data.P:].clone()
+        if data.P <= data.out_len:
+            x_input = y_pred[-data.P:].clone().to(dev)
         else:
-            x_input = torch.cat([x_input[ -(data.P-data.out_len):, :].clone(), y_pred.clone()], dim=0)
+            x_input = torch.cat([x_input[-(data.P-data.out_len):, :].clone(),
+                                y_pred.clone()], dim=0).to(dev)
 
 
         print('----------------------------Predicted months',str(i-n_input+1),'to',str(i-n_input+data.out_len),'--------------------------------------------------')
@@ -285,14 +292,13 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
             confidence_95=torch.cat((confidence_95,confidence))
 
 
-    scale = data.scale.expand(test.size(0), data.m) #scale will have the max of each column (142 max values)
+    dev_all = predict.device
+    scale = data.scale.expand(test.size(0), data.m).to(dev_all)  # scale도 같은 dev
 
-    #inverse normalisation
-    predict*=scale
-    test*=scale
-    variance*=scale
-    confidence_95*=scale
-
+    predict = predict.to(dev_all) * scale
+    test = test.to(dev_all) * scale
+    variance = variance.to(dev_all) * scale
+    confidence_95 = confidence_95.to(dev_all) * scale
 
     #Relative Squared Error RSE according to Lai et.al - numerator
     sum_squared_diff = torch.sum(torch.pow(test - predict, 2))
@@ -372,9 +378,10 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
     print('validation r=',str(r))
 
     for X, Y in data.get_batches(X, Y, batch_size, False):
-        X = X.to(device)
-        X = torch.unsqueeze(X,dim=1)
+        X = torch.unsqueeze(X, dim=1)
         X = X.transpose(2,3)
+        X = X.to(device)
+        Y = Y.to(device)
 
         # Bayesian estimation
         num_runs = 10
@@ -401,12 +408,14 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
         std_dev = torch.std(outputs, dim=0)#standard deviation
 
         # Calculate 95% confidence interval
-        confidence = z*std_dev/torch.sqrt(torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype))
+        confidence = z * std_dev / torch.sqrt(
+            torch.tensor(num_runs, device=std_dev.device, dtype=std_dev.dtype)  # ★ 상수도 같은 device/dtype
+        )
 
         output=mean #we will consider the mean to be the prediction
 
-        scale = data.scale.expand(Y.size(0), Y.size(1), data.m) #scale will have the max of each column (142 max values)
-        
+        scale = data.scale.expand(Y.size(0), Y.size(1), data.m).to(Y.device)
+
         #inverse normalisation
         output*=scale
         Y*=scale
@@ -505,6 +514,9 @@ def train(data, X, Y, model, criterion, optim, batch_size):
         model.zero_grad()
         X = torch.unsqueeze(X,dim=1)
         X = X.transpose(2,3)
+        X = X.to(device)
+        Y = Y.to(device)
+
         if iter % args.step_size == 0:
             perm = np.random.permutation(range(args.num_nodes))
         num_sub = int(args.num_nodes / args.num_split)
@@ -520,7 +532,8 @@ def train(data, X, Y, model, criterion, optim, batch_size):
             ty = Y[:, :, :] 
             output = model(tx)           
             output = torch.squeeze(output,3)
-            scale = data.scale.expand(output.size(0), output.size(1), data.m)
+            
+            scale = data.scale.expand(output.size(0), output.size(1), data.m).to(output.device)
             scale = scale[:,:,:] 
             
             output*=scale 
@@ -562,6 +575,10 @@ def set_random_seed(seed):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+
+# 어디서든 쓸 수 있게
+def current_device_of_model(model):
+    return next(model.parameters()).device
 
 def main(experiment):
     # Set fixed random seed for reproducibility
