@@ -42,3 +42,4 @@ Below is an example for the past and predicted future data for the Password Atta
 1. pt -> safetensor
 2. arguments에서 받아서 처리
 3. 연월 만드는 함수 추가
+4. device GPU 선택 할 수 있도록

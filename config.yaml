@@ -1,0 +1,43 @@
+# config.yaml
+data: "./data/Smoothed_CyberTrend_Forecasting_All.txt"
+log_interval: 2000
+save: "model/Bayesian/model.safetensors"
+optim: "adam"
+L1Loss: true
+normalize: 2
+device: "cuda:1"
+
+gcn_true: true
+buildA_true: true
+gcn_depth: 2
+num_nodes: 142
+dropout: 0.3
+subgraph_size: 20
+node_dim: 40
+dilation_exponential: 2
+conv_channels: 16
+residual_channels: 16
+skip_channels: 32
+end_channels: 64
+in_dim: 1
+seq_in_len: 10
+seq_out_len: 36
+horizon: 1
+layers: 5
+
+batch_size: 8
+lr: 0.001
+weight_decay: 0.00001
+clip: 10
+
+propalpha: 0.05
+tanhalpha: 3
+
+epochs: 200
+num_split: 1
+step_size: 100
+
+search_iters: 60
+train_ratio: 0.43
+valid_ratio: 0.30
+hp_path: "model/Bayesian/hp.txt"
