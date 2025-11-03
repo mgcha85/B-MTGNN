@@ -6,7 +6,7 @@ import torch.nn as nn
 from net import gtnet
 import numpy as np
 import random
-from util import *
+from util import DataLoaderS
 from trainer import Optim
 from random import randrange
 from matplotlib import pyplot as plt
