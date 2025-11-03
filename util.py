@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import pandas as pd
 import os
 import scipy.sparse as sp
 import torch
@@ -17,8 +18,16 @@ class DataLoaderS(object):
     def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
         self.P = window
         self.h = horizon
-        fin = open(file_name)
-        self.rawdat = np.loadtxt(fin, delimiter='\t')
+        
+        # fin = open(file_name)
+        # self.rawdat = np.loadtxt(fin, delimiter='\t')
+
+        df_raw = pd.read_csv(file_name, index_col=0)
+        self.rawdat = df_raw.values
+        df_raw.index = pd.to_datetime(df_raw.index, format='%b-%y')
+        self.timeindex = list(df_raw.index)
+        DataLoaderS.col = list(df_raw.columns)
+
         self.shift=0
         self.min_data=np.min(self.rawdat)
         if(self.min_data<0):
@@ -46,7 +55,7 @@ class DataLoaderS(object):
         self.device = device
 
         self.adj = self.build_predefined_adj() 
-        DataLoaderS.col = self.create_columns() 
+        # DataLoaderS.col = self.create_columns() 
 
     def _normalized(self, normalize):
         # normalized by the maximum value of entire matrix.
