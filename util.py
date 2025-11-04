@@ -41,7 +41,9 @@ class DataLoaderS(object):
         self.out_len=out
         self.scale = np.ones(self.m)
         self._normalized(normalize)#scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
-        self._split(int(train * self.n), int((train + valid) * self.n), self.n)
+        
+        self._split(self.n - 2 * self.out_len, self.n - self.out_len)
+        # self._split(int(train * self.n), int((train + valid) * self.n), self.n)
 
         self.scale = torch.from_numpy(self.scale).float()
         tmp = self.test[1] * self.scale.expand(self.test[1].size(0),self.test[1].size(1), self.m)#back to original values
@@ -73,7 +75,7 @@ class DataLoaderS(object):
                 self.dat[:, i] = self.rawdat[:, i] / np.max(np.abs(self.rawdat[:, i]))
                            
 
-    def _split(self, train, valid, test):
+    def _split(self, train, valid):
 
         train_set = range(self.P + self.h - 1,train)
         valid_set = range(train, valid) 
@@ -82,9 +84,8 @@ class DataLoaderS(object):
         self.train = self._batchify(train_set, self.h)
         self.valid = self._batchify(valid_set, self.h)
         self.test =  self._batchify(test_set, self.h)
-        
-        
-        self.test_window=torch.from_numpy(self.dat[-(36+self.P):, :]) 
+
+        self.test_window = torch.from_numpy(self.dat[-(36+self.P):, :]) 
 
     def _batchify(self, idx_set, horizon):
         n = len(idx_set) 
