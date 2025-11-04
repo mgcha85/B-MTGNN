@@ -493,8 +493,9 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
 
     #plot actual vs predicted curves and save errors to file
     counter=0
+    num_features = len(data.col)
     if is_plot:
-        for v in range(r,r+142):
+        for v in range(r,r+num_features):
             col=v%data.m
             node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
             node_name=consistent_name(node_name)
