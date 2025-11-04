@@ -30,7 +30,7 @@ def inverse_diff_3d(output, I,shift):
 
 def plot_data(data,title):
     x=range(1,len(data)+1)
-    plt.plot(x, Data,'b-',label='Actual')
+    plt.plot(x, data,'b-',label='Actual')
     plt.legend(loc="best",prop={'size': 11})
     plt.axis('tight')
     plt.grid(True)
