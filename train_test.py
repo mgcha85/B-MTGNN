@@ -30,7 +30,7 @@ def inverse_diff_3d(output, I,shift):
 
 def plot_data(data,title):
     x=range(1,len(data)+1)
-    plt.plot(x,data,'b-',label='Actual')
+    plt.plot(x, Data,'b-',label='Actual')
     plt.legend(loc="best",prop={'size': 11})
     plt.axis('tight')
     plt.grid(True)
@@ -216,7 +216,7 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
     
     x_input = test_window[0:n_input, :].clone() # Generate input sequence
 
-    for i in range(n_input, test_window.shape[0],data.out_len):
+    for i in range(n_input, test_window.shape[0], Data.out_len):
 
         print('**************x_input*******************')
         print(x_input[:,r])#prints 1 random column in the sliding window
@@ -664,23 +664,29 @@ def main(experiment):
         tanh_alpha=tanh_alphas[randrange(len(tanh_alphas))]
         
 
-        Data = DataLoaderS(args.data, args.train_ratio, args.valid_ratio, device,
-                    args.horizon, args.seq_in_len, args.normalize, args.seq_out_len)
+        Data = DataLoaderS(
+            args.data, 
+            device, 
+            args.horizon, 
+            args.seq_in_len, 
+            args.normalize, 
+            args.seq_out_len
+        )
 
 
-        print('train X:',Data.train[0].shape)
+        print('train X:', Data.train[0].shape)
         print('train Y:', Data.train[1].shape)
-        print('valid X:',Data.valid[0].shape)
-        print('valid Y:',Data.valid[1].shape)
-        print('test X:',Data.test[0].shape)
-        print('test Y:',Data.test[1].shape)
+        print('valid X:', Data.valid[0].shape)
+        print('valid Y:', Data.valid[1].shape)
+        print('test X:', Data.test[0].shape)
+        print('test Y:', Data.test[1].shape)
         print('test window:', Data.test_window.shape)
 
-        print('length of training set=',Data.train[0].shape[0])
-        print('length of validation set=',Data.valid[0].shape[0])
-        print('length of testing set=',Data.test[0].shape[0])
-        print('valid=', int((args.train_ratio + args.valid_ratio) * Data.n))
-              
+        print('length of training set=', Data.train[0].shape[0])
+        print('length of validation set=', Data.valid[0].shape[0])
+        print('length of testing set=', Data.test[0].shape[0])
+        print('valid=', int((args.seq_out_len) * Data.n))
+
         model = gtnet(args.gcn_true, args.buildA_true, gcn_depth, args.num_nodes,
                     device, Data.adj, dropout=dropout, subgraph_size=k,
                     node_dim=node_dim, dilation_exponential=dilation_ex,

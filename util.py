@@ -15,7 +15,7 @@ def normal_std(x):
 
 class DataLoaderS(object):
     # train and valid is the ratio of training set and validation set. test = 1 - train - valid
-    def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
+    def __init__(self, file_name, device, horizon, window, normalize=2, out=1):
         self.P = window
         self.h = horizon
         
@@ -46,7 +46,7 @@ class DataLoaderS(object):
         # self._split(int(train * self.n), int((train + valid) * self.n), self.n)
 
         self.scale = torch.from_numpy(self.scale).float()
-        tmp = self.test[1] * self.scale.expand(self.test[1].size(0),self.test[1].size(1), self.m)#back to original values
+        tmp = self.test[1] * self.scale.expand(self.test[1].size(0), self.test[1].size(1), self.m) #back to original values
 
         self.scale = self.scale.to(device)
         self.scale = Variable(self.scale)
@@ -57,7 +57,6 @@ class DataLoaderS(object):
         self.device = device
 
         self.adj = self.build_predefined_adj() 
-        # DataLoaderS.col = self.create_columns() 
 
     def _normalized(self, normalize):
         # normalized by the maximum value of entire matrix.
@@ -73,7 +72,6 @@ class DataLoaderS(object):
             for i in range(self.m):
                 self.scale[i] = np.max(np.abs(self.rawdat[:, i]))
                 self.dat[:, i] = self.rawdat[:, i] / np.max(np.abs(self.rawdat[:, i]))
-                           
 
     def _split(self, train, valid):
 
@@ -85,7 +83,7 @@ class DataLoaderS(object):
         self.valid = self._batchify(valid_set, self.h)
         self.test =  self._batchify(test_set, self.h)
 
-        self.test_window = torch.from_numpy(self.dat[-(36+self.P):, :]) 
+        self.test_window = torch.from_numpy(self.dat[-(self.out_len+self.P):, :]) 
 
     def _batchify(self, idx_set, horizon):
         n = len(idx_set) 
