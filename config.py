@@ -58,8 +58,8 @@ class Config:
     step_size: int = 100
 
     search_iters: int = 60 # 60
-    train_ratio: float = 0.43
-    valid_ratio: float = 0.30
+    train_ratio: float = 0.5
+    valid_ratio: float = 0.25
     hp_path: str = "model/Bayesian/hp.txt"
 
 def _coerce_type(name: str, value: Any, cfg: Config):

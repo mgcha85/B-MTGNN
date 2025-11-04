@@ -15,7 +15,7 @@ def normal_std(x):
 
 class DataLoaderS(object):
     # train and valid is the ratio of training set and validation set. test = 1 - train - valid
-    def __init__(self, file_name, device, horizon, window, normalize=2, out=1):
+    def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
         self.P = window
         self.h = horizon
         
@@ -40,10 +40,10 @@ class DataLoaderS(object):
         self.normalize = 2
         self.out_len=out
         self.scale = np.ones(self.m)
-        self._normalized(normalize)#scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
+        self._normalized(normalize) #scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
         
-        self._split(self.n - 2 * self.out_len, self.n - self.out_len)
-        # self._split(int(train * self.n), int((train + valid) * self.n), self.n)
+        # self._split(self.n - 2 * self.out_len, self.n - self.out_len)
+        self._split(int(train * self.n), int((train + valid) * self.n))
 
         self.scale = torch.from_numpy(self.scale).float()
         tmp = self.test[1] * self.scale.expand(self.test[1].size(0), self.test[1].size(1), self.m) #back to original values

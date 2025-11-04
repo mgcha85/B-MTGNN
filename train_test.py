@@ -216,7 +216,7 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
     
     x_input = test_window[0:n_input, :].clone() # Generate input sequence
 
-    for i in range(n_input, test_window.shape[0], Data.out_len):
+    for i in range(n_input, test_window.shape[0], data.out_len):
 
         print('**************x_input*******************')
         print(x_input[:,r])#prints 1 random column in the sliding window
@@ -666,6 +666,8 @@ def main(experiment):
 
         Data = DataLoaderS(
             args.data, 
+            args.train_ratio, 
+            args.valid_ratio, 
             device, 
             args.horizon, 
             args.seq_in_len, 
