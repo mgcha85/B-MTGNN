@@ -344,8 +344,10 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
 
     #plot predicted vs actual and save errors to file
     counter=0
+    num_features = len(data.col)
+
     if is_plot:
-        for v in range(r,r+142):
+        for v in range(r,r+num_features):
             col=v%data.m
             
             node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
