@@ -12,8 +12,58 @@ from random import randrange
 from matplotlib import pyplot as plt
 import time
 from safetensors.torch import save_file, load_file
+from safetensors import safe_open
 import pandas as pd
+import json
 
+
+def load_model(Data):
+    with safe_open(args.save, framework="pt", device="cpu") as f:
+        metadata = f.metadata() or {}
+        state_dict = {k: f.get_tensor(k) for k in f.keys()}
+
+    arch_json = metadata.get("arch")
+    if arch_json:
+        arch = json.loads(arch_json)
+        # 저장된 아키텍처로 모델 재생성
+        model = gtnet(
+            arch["gcn_true"],
+            arch["buildA_true"],
+            arch["gcn_depth"],
+            arch["num_nodes"],
+            device,
+            Data.adj,
+            dropout=arch["dropout"],
+            subgraph_size=arch["subgraph_size"],
+            node_dim=arch["node_dim"],
+            dilation_exponential=arch["dilation_exponential"],
+            conv_channels=arch["conv_channels"],
+            residual_channels=arch["residual_channels"],
+            skip_channels=arch["skip_channels"],
+            end_channels=arch["end_channels"],
+            seq_length=arch["seq_length"],
+            in_dim=arch["in_dim"],
+            out_dim=arch["out_dim"],
+            layers=arch["layers"],
+            propalpha=arch["propalpha"],
+            tanhalpha=arch["tanhalpha"],
+            layer_norm_affline=arch.get("layer_norm_affline", False),
+        ).to(device)
+
+        ret = model.load_state_dict(state_dict, strict=True)
+        if hasattr(ret, "missing_keys") and ret.missing_keys:
+            print("[load_state_dict] missing keys:", ret.missing_keys)
+        if hasattr(ret, "unexpected_keys") and ret.unexpected_keys:
+            print("[load_state_dict] unexpected keys:", ret.unexpected_keys)
+    else:
+        # 메타데이터가 없으면, 부분 로드(최소한 충돌은 방지)
+        print("[warn] No arch metadata in checkpoint. Falling back to partial load (strict=False).")
+        msd = model.state_dict()
+        filtered = {k: v for k, v in state_dict.items() if k in msd and v.shape == msd[k].shape}
+        msd.update(filtered)
+        model.load_state_dict(msd, strict=False)
+        print(f"[warn] Loaded {len(filtered)} / {len(msd)} tensors by shape-matching.")
+    return model
 
 def inverse_diff_2d(output, I,shift):
     output[0,:]=torch.exp(output[0,:]+torch.log(I+shift))-shift
@@ -375,6 +425,8 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
     sum_squared_diff=0
     sum_absolute_diff=0
     r=0 #we choose any node index for printing (debugging)
+    # Bayesian estimation
+    num_runs = 10
     print('validation r=',str(r))
 
     for X, Y in data.get_batches(X, Y, batch_size, False):
@@ -382,9 +434,6 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
         X = X.transpose(2,3)
         X = X.to(device)
         Y = Y.to(device)
-
-        # Bayesian estimation
-        num_runs = 10
 
         # Create a list to store the outputs
         outputs = []
@@ -748,7 +797,29 @@ def main(experiment):
                 # Save the model if the validation loss is the best we've seen so far.
                 sum_loss=val_loss+val_rae-val_corr
                 if (not math.isnan(val_corr)) and val_loss < best_rse:
-                    save_file(model.state_dict(), args.save)
+                    arch_meta = {
+                        "gcn_true": args.gcn_true,
+                        "buildA_true": args.buildA_true,
+                        "gcn_depth": gcn_depth,
+                        "num_nodes": args.num_nodes,
+                        "dropout": dropout,
+                        "subgraph_size": k,
+                        "node_dim": node_dim,
+                        "dilation_exponential": dilation_ex,
+                        "conv_channels": conv,
+                        "residual_channels": res,
+                        "skip_channels": skip,
+                        "end_channels": end,
+                        "seq_length": args.seq_in_len,
+                        "in_dim": args.in_dim,
+                        "out_dim": args.seq_out_len,
+                        "layers": layer,
+                        "propalpha": prop_alpha,
+                        "tanhalpha": tanh_alpha,
+                        "layer_norm_affline": False  # net.py에서 그대로 사용
+                    }
+                    save_file(model.state_dict(), args.save, metadata={"arch": json.dumps(arch_meta)})
+
                     best_val = sum_loss
                     best_rse= val_loss
                     best_rae= val_rae
@@ -777,16 +848,10 @@ def main(experiment):
     #save best hp to desk
     with open(args.hp_path, "w") as f:
         f.write(str(best_hp))
+    
 
-    # Load the best saved model.
-    state_dict = load_file(args.save)
-    ret = model.load_state_dict(state_dict, strict=True)  # or strict=False
-    # 3) 로드 결과 점검(선택)
-    if hasattr(ret, "missing_keys") and ret.missing_keys:
-        print("[load_state_dict] missing keys:", ret.missing_keys)
-    if hasattr(ret, "unexpected_keys") and ret.unexpected_keys:
-        print("[load_state_dict] unexpected keys:", ret.unexpected_keys)
-
+    model = load_model(Data)
+    
     # 4) 모델을 디바이스로 이동
     model = model.to(device)
 
