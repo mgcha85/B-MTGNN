@@ -132,10 +132,8 @@ def generate_month_labels(start: str, end: str):
     return [d.strftime('%b-%y') for d in dates]
 
 #plots predicted curve with actual curve. The x axis can be adjusted as needed
-def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95):
-
-    M = generate_month_labels("Jul-11", "Dec-24")
-
+def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95, M):
+    # M = generate_month_labels("Jul-11", "Dec-24")
     M2=[]
     p=[]
 
@@ -350,13 +348,13 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
         for v in range(r,r+142):
             col=v%data.m
             
-            node_name=DataLoaderS.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
+            node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
             node_name=consistent_name(node_name)
             
             #save error to file
             save_metrics_1d(torch.from_numpy(predict[:,col]),torch.from_numpy(Ytest[:,col]),node_name,'Testing')
             #plot
-            plot_predicted_actual(predict[:,col],Ytest[:,col],node_name, 'Testing',variance[:,col],confidence_95[:,col])
+            plot_predicted_actual(predict[:,col], Ytest[:,col], node_name, 'Testing', variance[:,col], confidence_95[:,col], data.timeindex)
             counter+=1
 
     return rrse,rae,correlation, smape
@@ -496,7 +494,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
     if is_plot:
         for v in range(r,r+142):
             col=v%data.m
-            node_name=DataLoaderS.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
+            node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
             node_name=consistent_name(node_name)
             save_metrics_1d(torch.from_numpy(predict[-1,:,col]),torch.from_numpy(Ytest[-1,:,col]),node_name,'Validation')
             plot_predicted_actual(predict[-1,:,col],Ytest[-1,:,col],node_name, 'Validation', variance[-1,:,col], confidence_95[-1,:,col])
