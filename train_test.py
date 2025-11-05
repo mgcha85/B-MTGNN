@@ -182,7 +182,7 @@ def generate_month_labels(start: str, end: str):
     return [d.strftime('%b-%y') for d in dates]
 
 #plots predicted curve with actual curve. The x axis can be adjusted as needed
-def plot_predicted_actual(predicted, actual, title, type,variance, confidence_95, M):
+def plot_predicted_actual(predicted, actual, title, type, variance, confidence_95, M):
     # M = generate_month_labels("Jul-11", "Dec-24")
     M2=[]
     p=[]
@@ -549,7 +549,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
             node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
             node_name=consistent_name(node_name)
             save_metrics_1d(torch.from_numpy(predict[-1,:,col]),torch.from_numpy(Ytest[-1,:,col]),node_name,'Validation')
-            plot_predicted_actual(predict[-1,:,col],Ytest[-1,:,col],node_name, 'Validation', variance[-1,:,col], confidence_95[-1,:,col])
+            plot_predicted_actual(predict[-1,:,col],Ytest[-1,:,col],node_name, 'Validation', variance[-1,:,col], confidence_95[-1,:,col], data.timeindex)
             counter+=1
     return rrse, rae, correlation, smape
 

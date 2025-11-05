@@ -42,8 +42,8 @@ class DataLoaderS(object):
         self.scale = np.ones(self.m)
         self._normalized(normalize) #scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
         
-        # self._split(self.n - 2 * self.out_len, self.n - self.out_len)
-        self._split(int(train * self.n), int((train + valid) * self.n))
+        self._split(self.n - 2 * (self.out_len + self.P), self.n - (self.out_len + self.P))
+        # self._split(int(train * self.n), int((train + valid) * self.n))
 
         self.scale = torch.from_numpy(self.scale).float()
         tmp = self.test[1] * self.scale.expand(self.test[1].size(0), self.test[1].size(1), self.m) #back to original values
@@ -79,15 +79,15 @@ class DataLoaderS(object):
         valid_set = range(train, valid) 
         test_set = range(valid, self.n)
         
-        self.train = self._batchify(train_set, self.h)
-        self.valid = self._batchify(valid_set, self.h)
-        self.test =  self._batchify(test_set, self.h)
+        self.train = self._batchify(train_set)
+        self.valid = self._batchify(valid_set)
+        self.test =  self._batchify(test_set)
 
         self.test_window = torch.from_numpy(self.dat[-(self.out_len+self.P):, :]) 
 
-    def _batchify(self, idx_set, horizon):
+    def _batchify(self, idx_set):
         n = len(idx_set) 
-        X = torch.zeros((n-self.out_len, self.P, self.m)) #n samples x P time steps lookback x number of columns.
+        X = torch.zeros((n-self.out_len, self.P, self.m))
         Y = torch.zeros((n-self.out_len, self.out_len, self.m)) 
 
         for i in range(n-self.out_len): 
