@@ -25,7 +25,7 @@ class Config:
     optim: str = "adam"
     L1Loss: bool = True
     normalize: int = 2
-    device: str = "cuda:1"
+    device: str = "cuda:0"
 
     gcn_true: bool = True
     buildA_true: bool = True

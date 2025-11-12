@@ -15,6 +15,7 @@ from safetensors.torch import save_file, load_file
 from safetensors import safe_open
 import pandas as pd
 import json
+import os
 
 
 def load_model(Data):
@@ -817,6 +818,7 @@ def main(experiment):
                         "layer_norm_affline": False  # net.py에서 그대로 사용
                     }
                     save_file(model.state_dict(), args.save, metadata={"arch": json.dumps(arch_meta)})
+                    print(f"Saved safetensors file to {args.save}, size = {os.path.getsize(args.save)} bytes")
 
                     best_val = sum_loss
                     best_rse= val_loss
@@ -824,7 +826,12 @@ def main(experiment):
                     best_corr= val_corr
                     best_smape=val_smape
 
-                    best_hp=[gcn_depth,lr,conv,res,skip,end, k, dropout, dilation_ex, node_dim, prop_alpha, tanh_alpha, layer, epoch]
+                    best_hp=[
+                        gcn_depth, lr, conv, res, 
+                        skip, end, k, dropout, 
+                        dilation_ex, node_dim, prop_alpha, tanh_alpha, 
+                        layer, epoch
+                    ]
                     
                     es_counter=0
                     

@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import pandas as pd
 import os
 import scipy.sparse as sp
 import torch
@@ -17,8 +18,12 @@ class DataLoaderS(object):
     def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
         self.P = window
         self.h = horizon
-        fin = open(file_name)
-        self.rawdat = np.loadtxt(fin, delimiter='\t')
+
+        df_raw = pd.read_csv(file_name, index_col=0)
+        self.rawdat = df_raw.values
+        self.col = list(df_raw.columns)
+        self.timeindex = list(df_raw.index)
+
         self.shift=0
         self.min_data=np.min(self.rawdat)
         if(self.min_data<0):
@@ -32,7 +37,7 @@ class DataLoaderS(object):
         self.out_len=out
         self.scale = np.ones(self.m)
         self._normalized(normalize)#scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
-        self._split(int(train * self.n), int((train + valid) * self.n), self.n)
+        self._split(int(train * self.n), int((train + valid) * self.n))
 
         self.scale = torch.from_numpy(self.scale).float()
         tmp = self.test[1] * self.scale.expand(self.test[1].size(0),self.test[1].size(1), self.m)#back to original values
@@ -46,7 +51,6 @@ class DataLoaderS(object):
         self.device = device
 
         self.adj = self.build_predefined_adj() 
-        DataLoaderS.col = self.create_columns()
 
     def _normalized(self, normalize):
         # normalized by the maximum value of entire matrix.
@@ -62,34 +66,34 @@ class DataLoaderS(object):
             for i in range(self.m):
                 self.scale[i] = np.max(np.abs(self.rawdat[:, i]))
                 self.dat[:, i] = self.rawdat[:, i] / np.max(np.abs(self.rawdat[:, i]))
-                
 
-    def _split(self, train, valid, test):
+    def _split(self, train, valid):
 
-        train_set = range(self.P + self.h - 1,self.n) #full data (for final training)
-        valid_set = range(train, valid)
+        train_set = range(self.P + self.h - 1,train)
+        valid_set = range(train, valid) 
         test_set = range(valid, self.n)
         
-        self.train = self._batchify(train_set, self.h)
-        self.valid = self._batchify(valid_set, self.h)
-        self.test =  self._batchify(test_set, self.h)
-        
-        
-        self.test_window=torch.from_numpy(self.dat[-(36+self.P):, :]) 
+        self.train = self._batchify(train_set)
+        self.valid = self._batchify(valid_set)
+        self.test =  self._batchify(test_set)
 
-    def _batchify(self, idx_set, horizon):
+        self.test_window = torch.from_numpy(self.dat[-(self.out_len+self.P):, :]) 
+        self.test_window_tf = self.timeindex[-(self.out_len+self.P):]
+
+    def _batchify(self, idx_set):
         n = len(idx_set) 
-        X = torch.zeros((n-self.out_len, self.P, self.m)) #n samples x P time steps lookback x number of columns.
+        X = torch.zeros((n-self.out_len, self.P, self.m))
         Y = torch.zeros((n-self.out_len, self.out_len, self.m)) 
 
+        tf = []
         for i in range(n-self.out_len): 
             end = idx_set[i] - self.h + 1 
             start = end - self.P 
             X[i, :, :] = torch.from_numpy(self.dat[start:end, :]) 
             Y[i, :, :] = torch.from_numpy(self.dat[idx_set[i]:idx_set[i]+self.out_len, :])
+            tf.append(self.timeindex[idx_set[i]:idx_set[i]+self.out_len])
             
-        return [X, Y]
-
+        return [X, Y, tf]
 
     def get_batches(self, inputs, targets, batch_size, shuffle=True):
         length = len(inputs)

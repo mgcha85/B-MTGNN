@@ -41,7 +41,6 @@ class DataLoaderS(object):
         self.out_len=out
         self.scale = np.ones(self.m)
         self._normalized(normalize) #scale will now be a torch of 1D containing the maximum column values (123 values (nodes)), self.dat will be normalised over the max
-        
         self._split(self.n - 2 * (self.out_len + self.P), self.n - (self.out_len + self.P))
         # self._split(int(train * self.n), int((train + valid) * self.n))
 
