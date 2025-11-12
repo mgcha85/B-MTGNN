@@ -1,15 +1,8 @@
-import pickle
 import numpy as np
-import os
-import scipy.sparse as sp
 import torch
-from scipy.sparse import linalg
-from torch.autograd import Variable
-import sys
 import csv
 from collections import defaultdict
 from matplotlib import pyplot
-import random
 
 pyplot.rcParams['savefig.dpi'] = 1200
 
@@ -51,7 +44,6 @@ def consistent_name(name):
                 result+=' '
 
         return result
-    
 
     words= name.split(' ')
     result=''
@@ -124,8 +116,6 @@ def zero_negative_curves(data, forecast, attack, solutions):
                 f[i]=0
     return data, forecast
            
-        
-
 #plots forecast of attack and relevant solutions trends. If alarming is set to True, plots the solutions trend forecasted to be less than the attack trend.
 def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=True):
 
@@ -137,12 +127,10 @@ def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=T
           "MediumSpringGreen", "DarkOliveGreen", "Teal", "OliveDrab", "MediumSeaGreen",
           "DeepSkyBlue", "MediumSlateBlue", "MediumTurquoise", "FireBrick",
           "DarkCyan", "violet", "MediumOrchid", "DarkSalmon", "DarkRed"]
-
     
     pyplot.style.use("seaborn-dark") 
     fig = pyplot.figure()
     ax = fig.add_axes([0.1, 0.1, 0.7, 0.75])
-
 
     #Plot the forecast of attack
     counter=0
@@ -204,7 +192,6 @@ def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=T
     pyplot.pause(5)
     pyplot.close()
 
-
 #saves the numerical forecast to text file as well as past data of each node
 def save_data(data, forecast, confidence, variance, col):
     # write the data and forecast
@@ -243,11 +230,6 @@ def save_gap(forecast, attack, solutions,index):
         sorted_table = sorted(table, key=lambda row: sum(row[-3:]))
         for row in sorted_table:
             writer.writerow(row)
-    
-
-
-
-
 
 #given data file, returns the list of column names and dictionary of the format (column name,column index)
 def create_columns(file_name):
@@ -267,7 +249,6 @@ def create_columns(file_name):
             col_index[c]=i
         
         return col_name,col_index
-
 
 #builds the attacks and pertinent technologies graph
 def build_graph(file_name):
@@ -290,154 +271,122 @@ def build_graph(file_name):
     return graph
 
 
+if __name__ == '__main__':
+    #This script forecasts the future of the graph, up to 3 years in advance
+    data_file='./data/sm_data.txt'
+    model_file='model/Bayesian/o_model.pt'
+    nodes_file='data/data.csv'
+    graph_file='data/graph.csv'
 
+    #read the data
+    fin = open(data_file)
+    rawdat = np.loadtxt(fin, delimiter='\t')
+    n, m = rawdat.shape
 
-#This script forecasts the future of the graph, up to 3 years in advance
+    #load column names and dictionary of (column name, index)
+    col, index=create_columns(nodes_file)
 
+    #build the graph in the format {attack:list of pertinent technologies}
+    graph = build_graph(graph_file)
 
-data_file='./data/sm_data.txt'
-model_file='model/Bayesian/o_model.pt'
-nodes_file='data/data.csv'
-graph_file='data/graph.csv'
+    #for normalisation
+    scale = np.ones(m)
+    dat = np.zeros(rawdat.shape)
 
+    #normalise
+    for i in range(m):
+        scale[i] = np.max(np.abs(rawdat[:, i]))
+        dat[:, i] = rawdat[:, i] / np.max(np.abs(rawdat[:, i]))
 
-#read the data
-fin = open(data_file)
-rawdat = np.loadtxt(fin, delimiter='\t')
-n, m = rawdat.shape
+    print('data shape:',dat.shape)
 
-#load column names and dictionary of (column name, index)
-col,index=create_columns(nodes_file)
+    #preparing last part of the data to be used for the forecast
+    P=10 #look back
+    X= torch.from_numpy(dat[-P:, :]) #look back 10 months
+    X = torch.unsqueeze(X,dim=0)
+    X = torch.unsqueeze(X,dim=1)
+    X = X.transpose(2,3)
+    X = X.to(torch.float)
 
+    #load the model
+    model=None
+    with open(model_file, 'rb') as f:
+        model = torch.load(f)
 
-#build the graph in the format {attack:list of pertinent technologies}
-graph=build_graph(graph_file)
+    # Bayesian estimation
+    num_runs = 10
+    # Create a list to store the outputs
+    outputs = []
 
-#for normalisation
-scale = np.ones(m)
-dat = np.zeros(rawdat.shape)
+    # Use model to predict next time step
+    for _ in range(num_runs):
+        with torch.no_grad():
+            output = model(X)  
+            y_pred = output[-1, :, :,-1].clone()#36x142
+        outputs.append(y_pred)
 
-#normalise
-for i in range(m):
-    scale[i] = np.max(np.abs(rawdat[:, i]))
-    dat[:, i] = rawdat[:, i] / np.max(np.abs(rawdat[:, i]))
-    
+    # Stack the outputs along a new dimension
+    outputs = torch.stack(outputs)
 
-print('data shape:',dat.shape)
+    Y = torch.mean(outputs,dim=0)
+    variance = torch.var(outputs, dim=0)#variance
+    std_dev = torch.std(outputs, dim=0)#standard deviation
+    # Calculate 95% confidence interval
+    z = 1.96
+    confidence=z*std_dev/torch.sqrt(torch.tensor(num_runs))
 
-#preparing last part of the data to be used for the forecast
-P=10 #look back
-X= torch.from_numpy(dat[-P:, :]) #look back 10 months
-X = torch.unsqueeze(X,dim=0)
-X = torch.unsqueeze(X,dim=1)
-X = X.transpose(2,3)
-X = X.to(torch.float)
+    dat *= scale
+    Y *= scale
+    variance *= scale
+    confidence *= scale
 
+    print('output shape:',Y.shape)
 
+    #----------------------------------------------------------------------------------------------------#
+    #Plotting:
 
-#load the model
-model=None
-with open(model_file, 'rb') as f:
-    model = torch.load(f)
+    #save the data to desk
+    dat=torch.from_numpy(dat)
+    save_data(dat,Y,confidence,variance,col)
 
+    #combine data
+    all=torch.cat((dat,Y), dim=0)
 
-# Bayesian estimation
-num_runs = 10
+    #scale down full data (global normalisation)
+    incident_max=-999999999
+    mention_max=-999999999
 
-# Create a list to store the outputs
-outputs = []
-
-
-# Use model to predict next time step
-for _ in range(num_runs):
-    with torch.no_grad():
-        output = model(X)  
-        y_pred = output[-1, :, :,-1].clone()#36x142
-    outputs.append(y_pred)
-
-# Stack the outputs along a new dimension
-outputs = torch.stack(outputs)
-
-
-Y=torch.mean(outputs,dim=0)
-variance = torch.var(outputs, dim=0)#variance
-std_dev = torch.std(outputs, dim=0)#standard deviation
-# Calculate 95% confidence interval
-z=1.96
-confidence=z*std_dev/torch.sqrt(torch.tensor(num_runs))
-
-dat*=scale
-Y*=scale
-variance*=scale
-confidence*=scale
-
-
-print('output shape:',Y.shape)
-
-#----------------------------------------------------------------------------------------------------#
-
-#Plotting:
-
-
-
-#save the data to desk
-dat=torch.from_numpy(dat)
-save_data(dat,Y,confidence,variance,col)
-
-#combine data
-all=torch.cat((dat,Y), dim=0)
-
-
-#scale down full data (global normalisation)
-incident_max=-999999999
-mention_max=-999999999
-
-for i in range(all.shape[0]):
-    for j in range(all.shape[1]):
-        if 'WAR' in col[j] or 'Holiday' in col[j] or j in range(16,32):
-            continue
-        if 'Mention' in col[j]:
-            if all[i,j]>mention_max:
-                mention_max=all[i,j]
-        else:
-            if all[i,j]>incident_max:
-                incident_max=all[i,j]
-
-all_n=torch.zeros(all.shape[0],all.shape[1])
-confidence_n=torch.zeros(confidence.shape[0],confidence.shape[1])
-u=0
-for i in range(all.shape[0]):
-    for j in range(all.shape[1]):
+    for i in range(all.shape[0]):
+        for j in range(all.shape[1]):
+            if 'WAR' in col[j] or 'Holiday' in col[j] or j in range(16,32):
+                continue
             if 'Mention' in col[j]:
-                all_n[i,j]=all[i,j]/mention_max
+                if all[i,j]>mention_max:
+                    mention_max=all[i,j]
             else:
-                all_n[i,j]=all[i,j]/incident_max
-            
-            if i>=all.shape[0]-36:
-                confidence_n[u,j]=confidence[u,j]*(all_n[i,j]/all[i,j])
-    if i>=all.shape[0]-36:
-        u+=1
+                if all[i,j]>incident_max:
+                    incident_max=all[i,j]
 
+    all_n=torch.zeros(all.shape[0],all.shape[1])
+    confidence_n=torch.zeros(confidence.shape[0],confidence.shape[1])
+    u=0
+    for i in range(all.shape[0]):
+        for j in range(all.shape[1]):
+                if 'Mention' in col[j]:
+                    all_n[i,j]=all[i,j]/mention_max
+                else:
+                    all_n[i,j]=all[i,j]/incident_max
+                
+                if i>=all.shape[0]-36:
+                    confidence_n[u,j]=confidence[u,j]*(all_n[i,j]/all[i,j])
+        if i>=all.shape[0]-36:
+            u+=1
 
-#smoothing
-smoothed_dat=torch.stack(exponential_smoothing(all_n, 0.1))
-smoothed_confidence=torch.stack(exponential_smoothing(confidence_n, 0.1))
+    #smoothing
+    smoothed_dat = torch.stack(exponential_smoothing(all_n, 0.1))
+    smoothed_confidence = torch.stack(exponential_smoothing(confidence_n, 0.1))
 
-
-
-
-
-#plot all forecasted nodes in the graph as groups of plots. Each plot consists of a single attack and its pertinent technologies
-for attack, solutions in graph.items():
-    plot_forecast(smoothed_dat[:-36,],smoothed_dat[-36:,], smoothed_confidence,attack,solutions,index,col)
-    save_gap(smoothed_dat[-36:,],attack,solutions,index) #save gaps of each attack to file
-    
-
-
-
-
-
-
-
-
-
+    #plot all forecasted nodes in the graph as groups of plots. Each plot consists of a single attack and its pertinent technologies
+    for attack, solutions in graph.items():
+        plot_forecast(smoothed_dat[:-36,],smoothed_dat[-36:,], smoothed_confidence,attack,solutions,index,col)
+        save_gap(smoothed_dat[-36:,],attack,solutions,index) #save gaps of each attack to file

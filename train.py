@@ -23,7 +23,7 @@ plt.rcParams['savefig.dpi'] = 1200
 
 
 def load_model(Data):
-    with safe_open(args.save, framework="pt", device="cpu") as f:
+    with safe_open(args.o_save, framework="pt", device="cpu") as f:
         metadata = f.metadata() or {}
         state_dict = {k: f.get_tensor(k) for k in f.keys()}
 
