@@ -84,19 +84,22 @@ class DataLoaderS(object):
         self.test =  self._batchify(test_set)
 
         self.test_window = torch.from_numpy(self.dat[-(self.out_len+self.P):, :]) 
+        self.test_window_tf = self.timeindex[-(self.out_len+self.P):]
 
     def _batchify(self, idx_set):
         n = len(idx_set) 
         X = torch.zeros((n-self.out_len, self.P, self.m))
         Y = torch.zeros((n-self.out_len, self.out_len, self.m)) 
 
+        tf = []
         for i in range(n-self.out_len): 
             end = idx_set[i] - self.h + 1 
             start = end - self.P 
             X[i, :, :] = torch.from_numpy(self.dat[start:end, :]) 
             Y[i, :, :] = torch.from_numpy(self.dat[idx_set[i]:idx_set[i]+self.out_len, :])
+            tf.append(self.timeindex[idx_set[i]:idx_set[i]+self.out_len])
             
-        return [X, Y]
+        return [X, Y, tf]
 
 
     def get_batches(self, inputs, targets, batch_size, shuffle=True):

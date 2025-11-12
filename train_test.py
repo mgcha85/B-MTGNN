@@ -190,15 +190,15 @@ def plot_predicted_actual(predicted, actual, title, type, variance, confidence_9
     len_pred = len(predicted)
     #last 3 years
     if type=='Testing':
-        M=M[-len_pred:]
-        for index,value in enumerate(M):
+        # M=M[-len_pred:]
+        for index, value in enumerate(M):
             if 'Dec' in value or 'Mar' in value or 'Jun' in value or 'Sep' in value:
                 M2.append(value)
                 p.append(index+1) 
     
     else: ## last 3 years before Test data
-        M=M[-2*len_pred:-len_pred]
-        for index,value in enumerate(M):
+        # M=M[-2*len_pred:-len_pred]
+        for index, value in enumerate(M):
             if 'Dec' in value or 'Mar' in value or 'Jun' in value or 'Sep' in value:
                 M2.append(value)
                 p.append(index+1) 
@@ -243,7 +243,7 @@ def s_mape(yTrue,yPred):
 #for testing the model on unseen data, a sliding window can be used when the output period of the model is smaller than the target period to be forecasted.
 #The sliding window uses the output from previous step as input of the next step.
 #In our case, the window was not slided (we predicted 36 months and the model by default predicts 36 months)
-def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_input, is_plot, z=1.96):
+def evaluate_sliding_window(data, test_window, test_window_tf, model, evaluateL2, evaluateL1, n_input, is_plot, z=1.96):
     dev = current_device_of_model(model)
     test_window = test_window.to(dev)
 
@@ -406,14 +406,14 @@ def evaluate_sliding_window(data, test_window, model, evaluateL2, evaluateL1, n_
             #save error to file
             save_metrics_1d(torch.from_numpy(predict[:,col]),torch.from_numpy(Ytest[:,col]),node_name,'Testing')
             #plot
-            plot_predicted_actual(predict[:,col], Ytest[:,col], node_name, 'Testing', variance[:,col], confidence_95[:,col], data.timeindex)
+            plot_predicted_actual(predict[:,col], Ytest[:,col], node_name, 'Testing', variance[:,col], confidence_95[:,col], test_window_tf)
             counter+=1
 
     return rrse,rae,correlation, smape
 
 
 
-def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1.96):
+def evaluate(data, X_, Y_, tf, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1.96):
     #model.eval()# To get Bayesian estimation, we must comment out this line
     total_loss = 0
     total_loss_l1 = 0
@@ -429,7 +429,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
     num_runs = 10
     print('validation r=',str(r))
 
-    for X, Y in data.get_batches(X, Y, batch_size, False):
+    for X, Y in data.get_batches(X_, Y_, batch_size, False):
         X = torch.unsqueeze(X, dim=1)
         X = X.transpose(2,3)
         X = X.to(device)
@@ -480,7 +480,7 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
             predict = torch.cat((predict, output))
             test = torch.cat((test, Y))
             variance= torch.cat((variance, var))
-            confidence_95=torch.cat((confidence_95,confidence))
+            confidence_95=torch.cat((confidence_95, confidence))
 
 
         print('EVALUATE RESULTS:')
@@ -521,7 +521,6 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
     rae=sum_absolute_diff/sum_absolute_r # RAE
     rae=rae.item()
 
-
     predict = predict.data.cpu().numpy()
     Ytest = test.data.cpu().numpy()
     sigma_p = (predict).std(axis=0)
@@ -539,7 +538,6 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
             smape+=s_mape(Ytest[x,:,z],predict[x,:,z])
     smape/=Ytest.shape[0]*Ytest.shape[2]
 
-
     #plot actual vs predicted curves and save errors to file
     counter=0
     num_features = len(data.col)
@@ -548,13 +546,13 @@ def evaluate(data, X, Y, model, evaluateL2, evaluateL1, batch_size, is_plot, z=1
             col=v%data.m
             node_name=data.col[col].replace('-ALL','').replace('Mentions-','Mentions of ').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
             node_name=consistent_name(node_name)
-            save_metrics_1d(torch.from_numpy(predict[-1,:,col]),torch.from_numpy(Ytest[-1,:,col]),node_name,'Validation')
-            plot_predicted_actual(predict[-1,:,col],Ytest[-1,:,col],node_name, 'Validation', variance[-1,:,col], confidence_95[-1,:,col], data.timeindex)
+            save_metrics_1d(torch.from_numpy(predict[-1,:,col]), torch.from_numpy(Ytest[-1,:,col]), node_name, 'Validation')
+            plot_predicted_actual(predict[-1,:,col], Ytest[-1,:,col], node_name, 'Validation', variance[-1,:,col], confidence_95[-1,:,col], tf[-1])
             counter+=1
     return rrse, rae, correlation, smape
 
 
-def train(data, X, Y, model, criterion, optim, batch_size):
+def train(data, X, Y, tf, model, criterion, optim, batch_size):
     model.train()
     total_loss = 0
     n_samples = 0
@@ -788,8 +786,8 @@ def main(experiment):
                 es_counter+=1 # feel free to use this for early stopping (not used)
 
                 epoch_start_time = time.time()
-                train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args.batch_size)
-                val_loss, val_rae, val_corr, val_smape = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1,
+                train_loss = train(Data, Data.train[0], Data.train[1], Data.train[2], model, criterion, optim, args.batch_size)
+                val_loss, val_rae, val_corr, val_smape = evaluate(Data, Data.valid[0], Data.valid[1], Data.valid[2], model, evaluateL2, evaluateL1,
                                                  args.batch_size,False)
                 print(
                     '| end of epoch {:3d} | time: {:5.2f}s | train_loss {:5.4f} | valid rse {:5.4f} | valid rae {:5.4f} | valid corr  {:5.4f} | valid smape  {:5.4f}'.format(
@@ -830,7 +828,7 @@ def main(experiment):
                     
                     es_counter=0
                     
-                    test_acc, test_rae, test_corr, test_smape = evaluate_sliding_window(Data, Data.test_window, model, evaluateL2, evaluateL1,
+                    test_acc, test_rae, test_corr, test_smape = evaluate_sliding_window(Data, Data.test_window, Data.test_window_tf, model, evaluateL2, evaluateL1,
                                            args.seq_in_len, False) 
                     print('********************************************************************************************************')
                     print("test rse {:5.4f} | test rae {:5.4f} | test corr {:5.4f}| test smape {:5.4f}".format(test_acc, test_rae, test_corr, test_smape), flush=True)
@@ -855,10 +853,10 @@ def main(experiment):
     # 4) 모델을 디바이스로 이동
     model = model.to(device)
 
-    vtest_acc, vtest_rae, vtest_corr, vtest_smape = evaluate(Data, Data.valid[0], Data.valid[1], model, evaluateL2, evaluateL1,
+    vtest_acc, vtest_rae, vtest_corr, vtest_smape = evaluate(Data, Data.valid[0], Data.valid[1], Data.valid[2], model, evaluateL2, evaluateL1,
                                          args.batch_size, True)
 
-    test_acc, test_rae, test_corr, test_smape = evaluate_sliding_window(Data, Data.test_window, model, evaluateL2, evaluateL1,
+    test_acc, test_rae, test_corr, test_smape = evaluate_sliding_window(Data, Data.test_window, Data.test_window_tf, model, evaluateL2, evaluateL1,
                                          args.seq_in_len, True) 
     print('********************************************************************************************************')    
     print("final test rse {:5.4f} | test rae {:5.4f} | test corr {:5.4f} | test smape {:5.4f}".format(test_acc, test_rae, test_corr, test_smape))
