@@ -21,7 +21,8 @@ class Config:
     # === defaults (현재 코드와 동일) ===
     data: str = "./data/Smoothed_CyberTrend_Forecasting_All.csv"
     log_interval: int = 2000
-    save: str = "model/Bayesian/model.safetensors"
+    o_save: str = "model/Bayesian/o_save.safetensors"
+    save: str = "model/Bayesian/save.safetensors"
     optim: str = "adam"
     L1Loss: bool = True
     normalize: int = 2

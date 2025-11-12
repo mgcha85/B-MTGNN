@@ -19,7 +19,7 @@ import os
 
 
 def load_model(Data):
-    with safe_open(args.save, framework="pt", device="cpu") as f:
+    with safe_open(args.o_save, framework="pt", device="cpu") as f:
         metadata = f.metadata() or {}
         state_dict = {k: f.get_tensor(k) for k in f.keys()}
 
@@ -817,8 +817,8 @@ def main(experiment):
                         "tanhalpha": tanh_alpha,
                         "layer_norm_affline": False  # net.py에서 그대로 사용
                     }
-                    save_file(model.state_dict(), args.save, metadata={"arch": json.dumps(arch_meta)})
-                    print(f"Saved safetensors file to {args.save}, size = {os.path.getsize(args.save)} bytes")
+                    save_file(model.state_dict(), args.o_save, metadata={"arch": json.dumps(arch_meta)})
+                    print(f"Saved safetensors file to {args.o_save}, size = {os.path.getsize(args.o_save)} bytes")
 
                     best_val = sum_loss
                     best_rse= val_loss

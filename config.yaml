@@ -1,7 +1,8 @@
 # config.yaml
 data: "./data/Smoothed_CyberTrend_Forecasting_All.txt"
 log_interval: 2000
-save: "model/Bayesian/model.safetensors"
+o_save: "model/Bayesian/model.safetensors"
+save: "model/Bayesian/model_o.safetensors"
 optim: "adam"
 L1Loss: true
 normalize: 2
