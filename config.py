@@ -27,6 +27,11 @@ class Config:
     L1Loss: bool = True
     normalize: int = 2
     device: str = "cuda:0"
+    
+    # forcast
+    data_file: str = './data/sm_data.txt'
+    nodes_file: str = 'data/data.csv'
+    graph_file: str = 'data/graph.csv'
 
     gcn_true: bool = True
     buildA_true: bool = True

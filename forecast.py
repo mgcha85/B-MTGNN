@@ -3,8 +3,60 @@ import torch
 import csv
 from collections import defaultdict
 from matplotlib import pyplot
+from safetensors import safe_open
+import json
+from net import gtnet
+import pandas as pd
 
 pyplot.rcParams['savefig.dpi'] = 1200
+
+def load_model(Data):
+    with safe_open(args.o_save, framework="pt", device="cpu") as f:
+        metadata = f.metadata() or {}
+        state_dict = {k: f.get_tensor(k) for k in f.keys()}
+
+    arch_json = metadata.get("arch")
+    if arch_json:
+        arch = json.loads(arch_json)
+        # 저장된 아키텍처로 모델 재생성
+        model = gtnet(
+            arch["gcn_true"],
+            arch["buildA_true"],
+            arch["gcn_depth"],
+            arch["num_nodes"],
+            device,
+            Data.adj,
+            dropout=arch["dropout"],
+            subgraph_size=arch["subgraph_size"],
+            node_dim=arch["node_dim"],
+            dilation_exponential=arch["dilation_exponential"],
+            conv_channels=arch["conv_channels"],
+            residual_channels=arch["residual_channels"],
+            skip_channels=arch["skip_channels"],
+            end_channels=arch["end_channels"],
+            seq_length=arch["seq_length"],
+            in_dim=arch["in_dim"],
+            out_dim=arch["out_dim"],
+            layers=arch["layers"],
+            propalpha=arch["propalpha"],
+            tanhalpha=arch["tanhalpha"],
+            layer_norm_affline=arch.get("layer_norm_affline", False),
+        ).to(device)
+
+        ret = model.load_state_dict(state_dict, strict=True)
+        if hasattr(ret, "missing_keys") and ret.missing_keys:
+            print("[load_state_dict] missing keys:", ret.missing_keys)
+        if hasattr(ret, "unexpected_keys") and ret.unexpected_keys:
+            print("[load_state_dict] unexpected keys:", ret.unexpected_keys)
+    else:
+        # 메타데이터가 없으면, 부분 로드(최소한 충돌은 방지)
+        print("[warn] No arch metadata in checkpoint. Falling back to partial load (strict=False).")
+        msd = model.state_dict()
+        filtered = {k: v for k, v in state_dict.items() if k in msd and v.shape == msd[k].shape}
+        msd.update(filtered)
+        model.load_state_dict(msd, strict=False)
+        print(f"[warn] Loaded {len(filtered)} / {len(msd)} tensors by shape-matching.")
+    return model
 
 
 def exponential_smoothing(series, alpha):
@@ -233,9 +285,8 @@ def save_gap(forecast, attack, solutions,index):
 
 #given data file, returns the list of column names and dictionary of the format (column name,column index)
 def create_columns(file_name):
-
-    col_name=[]
-    col_index={}
+    col_name = []
+    col_index = {}
 
     # Read the CSV file of the dataset
     with open(file_name, 'r') as f:
@@ -248,7 +299,7 @@ def create_columns(file_name):
         for i,c in enumerate(col_name):
             col_index[c]=i
         
-        return col_name,col_index
+        return col_name, col_index
 
 #builds the attacks and pertinent technologies graph
 def build_graph(file_name):
@@ -273,21 +324,25 @@ def build_graph(file_name):
 
 if __name__ == '__main__':
     #This script forecasts the future of the graph, up to 3 years in advance
-    data_file='./data/sm_data.txt'
-    model_file='model/Bayesian/o_model.pt'
-    nodes_file='data/data.csv'
-    graph_file='data/graph.csv'
+    from config import get_args  
+    args = get_args()
 
-    #read the data
-    fin = open(data_file)
-    rawdat = np.loadtxt(fin, delimiter='\t')
+    if torch.cuda.is_available():
+        # GPU가 있다면
+        device = torch.device(args.device)
+    else:
+        device = torch.device("cpu")
+
+    # read the data
+    df = pd.read_csv(args.data_file)
+    rawdat = df.values
     n, m = rawdat.shape
 
     #load column names and dictionary of (column name, index)
-    col, index=create_columns(nodes_file)
+    col, index = create_columns(args.nodes_file)
 
     #build the graph in the format {attack:list of pertinent technologies}
-    graph = build_graph(graph_file)
+    graph = build_graph(args.graph_file)
 
     #for normalisation
     scale = np.ones(m)
@@ -310,7 +365,7 @@ if __name__ == '__main__':
 
     #load the model
     model=None
-    with open(model_file, 'rb') as f:
+    with open(args.save, 'rb') as f:
         model = torch.load(f)
 
     # Bayesian estimation
