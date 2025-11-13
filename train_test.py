@@ -722,10 +722,10 @@ def main(experiment):
             device, 
             args.horizon, 
             args.seq_in_len, 
+            args.graph_file,
             args.normalize, 
             args.seq_out_len
         )
-
 
         print('train X:', Data.train[0].shape)
         print('train Y:', Data.train[1].shape)

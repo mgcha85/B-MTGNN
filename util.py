@@ -15,7 +15,7 @@ def normal_std(x):
 
 class DataLoaderS(object):
     # train and valid is the ratio of training set and validation set. test = 1 - train - valid
-    def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
+    def __init__(self, file_name, train, valid, device, horizon, window, graph_file, normalize=2, out=1):
         self.P = window
         self.h = horizon
         

@@ -15,7 +15,7 @@ def normal_std(x):
 
 class DataLoaderS(object):
     # train and valid is the ratio of training set and validation set. test = 1 - train - valid
-    def __init__(self, file_name, train, valid, device, horizon, window, normalize=2, out=1):
+    def __init__(self, file_name, train, valid, device, horizon, window, graph_file, normalize=2, out=1):
         self.P = window
         self.h = horizon
 
@@ -50,7 +50,7 @@ class DataLoaderS(object):
 
         self.device = device
 
-        self.adj = self.build_predefined_adj() 
+        self.adj = self.build_predefined_adj(graph_file) 
 
     def _normalized(self, normalize):
         # normalized by the maximum value of entire matrix.
@@ -113,12 +113,12 @@ class DataLoaderS(object):
             start_idx += batch_size
 
     #by Zaid et al.
-    def build_predefined_adj(self):
+    def build_predefined_adj(self, filaname):
         # Initialize an empty dictionary with default value as an empty list
         graph = defaultdict(list)
 
         # Read the graph CSV file
-        with open('data/graph.csv', 'r') as f:
+        with open(filaname, 'r') as f:
             reader = csv.reader(f)
             # Iterate over each row in the CSV file
             for row in reader:

@@ -205,7 +205,17 @@ if __name__ == "__main__":
     tanh_alpha = hp[11]  
     epochs = hp[-1]  
 
-    Data = DataLoaderS(args.data, args.train_ratio, args.valid_ratio, device, args.horizon, args.seq_in_len, args.normalize, args.seq_out_len)  
+    Data = DataLoaderS(
+        args.data, 
+        args.train_ratio, 
+        args.valid_ratio, 
+        device, 
+        args.horizon, 
+        args.seq_in_len, 
+        args.graph_file,
+        args.normalize, 
+        args.seq_out_len
+    )
     model = load_model(Data)
 
     print(args)  
@@ -232,19 +242,27 @@ if __name__ == "__main__":
             train_loss = train(Data, Data.train[0], Data.train[1], model, criterion, optim, args.batch_size, args)  
 
         arch_meta = {
+            "gcn_true": args.gcn_true,
+            "buildA_true": args.buildA_true,
             "gcn_depth": gcn_depth,
+            "num_nodes": args.num_nodes,
+            "dropout": dropout,
+            "subgraph_size": k,
+            "node_dim": node_dim,
+            "dilation_exponential": dilation_ex,
             "conv_channels": conv,
             "residual_channels": res,
             "skip_channels": skip,
             "end_channels": end,
+            "seq_length": args.seq_in_len,
+            "in_dim": args.in_dim,
+            "out_dim": args.seq_out_len,
             "layers": layer,
-            "subgraph_size": k,
-            "dropout": dropout,
-            "dilation_exponential": dilation_ex,
-            "node_dim": node_dim,
             "propalpha": prop_alpha,
-            "tanhalpha": tanh_alpha
+            "tanhalpha": tanh_alpha,
+            "layer_norm_affline": False  # net.py에서 그대로 사용
         }
+
         metadata = {"arch": json.dumps(arch_meta)}
 
         # state_dict 저장
