@@ -7,6 +7,8 @@ from safetensors import safe_open
 import json
 from net import gtnet
 import pandas as pd
+from o_util import DataLoaderS
+
 
 pyplot.rcParams['savefig.dpi'] = 1200
 
@@ -334,12 +336,17 @@ if __name__ == '__main__':
         device = torch.device("cpu")
 
     # read the data
-    df = pd.read_csv(args.data_file)
+    df = pd.read_csv(args.data, index_col=0)
     rawdat = df.values
     n, m = rawdat.shape
 
+    timeindex = list(df.index)
+    col = list(df.columns)
+
+    index = {col:i for i, col in enumerate(col)}
+
     #load column names and dictionary of (column name, index)
-    col, index = create_columns(args.nodes_file)
+    # col_, index_ = create_columns(args.nodes_file)
 
     #build the graph in the format {attack:list of pertinent technologies}
     graph = build_graph(args.graph_file)
@@ -353,7 +360,7 @@ if __name__ == '__main__':
         scale[i] = np.max(np.abs(rawdat[:, i]))
         dat[:, i] = rawdat[:, i] / np.max(np.abs(rawdat[:, i]))
 
-    print('data shape:',dat.shape)
+    print('data shape:', dat.shape)
 
     #preparing last part of the data to be used for the forecast
     P=10 #look back
@@ -363,10 +370,8 @@ if __name__ == '__main__':
     X = X.transpose(2,3)
     X = X.to(torch.float)
 
-    #load the model
-    model=None
-    with open(args.save, 'rb') as f:
-        model = torch.load(f)
+    Data = DataLoaderS(args.data, args.train_ratio, args.valid_ratio, device, args.horizon, args.seq_in_len, args.normalize, args.seq_out_len)
+    model = load_model(Data)
 
     # Bayesian estimation
     num_runs = 10
@@ -432,9 +437,9 @@ if __name__ == '__main__':
                 else:
                     all_n[i,j]=all[i,j]/incident_max
                 
-                if i>=all.shape[0]-36:
+                if i>=all.shape[0]-args.seq_out_len:
                     confidence_n[u,j]=confidence[u,j]*(all_n[i,j]/all[i,j])
-        if i>=all.shape[0]-36:
+        if i>=all.shape[0]-args.seq_out_len:
             u+=1
 
     #smoothing
@@ -443,5 +448,5 @@ if __name__ == '__main__':
 
     #plot all forecasted nodes in the graph as groups of plots. Each plot consists of a single attack and its pertinent technologies
     for attack, solutions in graph.items():
-        plot_forecast(smoothed_dat[:-36,],smoothed_dat[-36:,], smoothed_confidence,attack,solutions,index,col)
-        save_gap(smoothed_dat[-36:,],attack,solutions,index) #save gaps of each attack to file
+        plot_forecast(smoothed_dat[:-args.seq_out_len,],smoothed_dat[-args.seq_out_len:,], smoothed_confidence, attack, solutions, index, col)
+        save_gap(smoothed_dat[-args.seq_out_len:,], attack, solutions, index) #save gaps of each attack to file
