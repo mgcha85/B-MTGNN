@@ -277,12 +277,19 @@ def save_data(data, forecast, confidence, variance, col):
     ff.close()
 
 #saves the forecasted trend's gap between attack and its relevant solutions to a csv file. The gap is for 3 years resulting in 3 values per solution.
-def save_gap(forecast, attack, solutions,index):
+def save_gap(forecast, attack, solutions, index):    
+    # df.index에서 연도 추출
+    years = sorted(list(set(timeindex.year)))
+
+    # 마지막 연도에서 3년 추가
+    last_year = years[-1]
+    future_years = [last_year + i for i in range(1, 4)]
+
     # write the data and forecast
     with open(args.gap_dir+consistent_name(attack).replace('/','_')+'_gap.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         # Write the list as a row
-        writer.writerow(['Solution','2023','2024','2025'])
+        writer.writerow(['Solution'] + future_years)
         table=[]
         a=forecast[:,index[attack]].tolist()
         a_reduced= [sum(a[i:i+12]) / 12 for i in range(0, len(a), 12)] #mean of every 12 months
