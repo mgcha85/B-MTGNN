@@ -7,13 +7,14 @@ from safetensors import safe_open
 import json
 from net import gtnet
 import pandas as pd
+import math
 from o_util import DataLoaderS
 
 
 pyplot.rcParams['savefig.dpi'] = 1200
 
 def load_model(Data):
-    with safe_open(args.save, framework="pt", device="cpu") as f:
+    with safe_open(args.o_save, framework="pt", device="cpu") as f:
         metadata = f.metadata() or {}
         state_dict = {k: f.get_tensor(k) for k in f.keys()}
 
@@ -22,18 +23,27 @@ def load_model(Data):
         arch = json.loads(arch_json)
         # 저장된 아키텍처로 모델 재생성
         model = gtnet(
+            arch["gcn_true"],
+            arch["buildA_true"],
             arch["gcn_depth"],
+            arch["num_nodes"],
+            device,
+            Data.adj,
+            dropout=arch["dropout"],
+            subgraph_size=arch["subgraph_size"],
+            node_dim=arch["node_dim"],
+            dilation_exponential=arch["dilation_exponential"],
             conv_channels=arch["conv_channels"],
             residual_channels=arch["residual_channels"],
             skip_channels=arch["skip_channels"],
             end_channels=arch["end_channels"],
+            seq_length=arch["seq_length"],
+            in_dim=arch["in_dim"],
+            out_dim=arch["out_dim"],
             layers=arch["layers"],
-            subgraph_size=arch["subgraph_size"],
-            dropout=arch["dropout"],
-            dilation_exponential=arch["dilation_exponential"],
-            node_dim=arch["node_dim"],
             propalpha=arch["propalpha"],
             tanhalpha=arch["tanhalpha"],
+            layer_norm_affline=arch.get("layer_norm_affline", False),
         ).to(device)
 
         ret = model.load_state_dict(state_dict, strict=True)
@@ -360,9 +370,12 @@ if __name__ == '__main__':
     X = torch.unsqueeze(X,dim=1)
     X = X.transpose(2,3)
     X = X.to(torch.float)
+    X = X.to(torch.float).to(device)   # ← 이 줄 추가 수정 (device 로 올리기)
 
     Data = DataLoaderS(args.data, args.train_ratio, args.valid_ratio, device, args.horizon, args.seq_in_len, args.graph_file, args.normalize, args.seq_out_len)
     model = load_model(Data)
+    model = model.to(device)
+
 
     # Bayesian estimation
     num_runs = 10
@@ -384,7 +397,11 @@ if __name__ == '__main__':
     std_dev = torch.std(outputs, dim=0)#standard deviation
     # Calculate 95% confidence interval
     z = 1.96
-    confidence=z*std_dev/torch.sqrt(torch.tensor(num_runs))
+    confidence = z * std_dev / math.sqrt(num_runs)
+
+    Y = Y.cpu()
+    variance = variance.cpu()
+    confidence = confidence.cpu()
 
     dat *= scale
     Y *= scale
