@@ -183,7 +183,8 @@ def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=T
           "DeepSkyBlue", "MediumSlateBlue", "MediumTurquoise", "FireBrick",
           "DarkCyan", "violet", "MediumOrchid", "DarkSalmon", "DarkRed"]
     
-    pyplot.style.use("seaborn-dark") 
+    pyplot.style.use("seaborn-v0_8-dark")
+
     fig = pyplot.figure()
     ax = fig.add_axes([0.1, 0.1, 0.7, 0.75])
 
