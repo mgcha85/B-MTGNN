@@ -70,7 +70,6 @@ def exponential_smoothing(series, alpha):
     return result
 
 def consistent_name(name):
-
     name=name.replace('-ALL','').replace('Mentions-','').replace(' ALL','').replace('Solution_','').replace('_Mentions','')
     
     #special case
