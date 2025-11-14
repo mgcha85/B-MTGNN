@@ -172,33 +172,26 @@ def zero_negative_curves(data, forecast, attack, solutions):
     return data, forecast
            
 #plots forecast of attack and relevant solutions trends. If alarming is set to True, plots the solutions trend forecasted to be less than the attack trend.
-def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=True):
+def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, index, col, alarming=True):
+    data, forecast= zero_negative_curves(data, forecast, attack, solutions)
+    n = len(args.colours)
 
-    data,forecast= zero_negative_curves(data, forecast, attack, solutions)
-    
-    colours = ["RoyalBlue", "Crimson", "DarkOrange", "MediumPurple", "MediumVioletRed",
-          "DodgerBlue", "Indigo", "coral", "hotpink", "DarkMagenta",
-          "SteelBlue", "brown", "MediumAquamarine", "SlateBlue", "SeaGreen",
-          "MediumSpringGreen", "DarkOliveGreen", "Teal", "OliveDrab", "MediumSeaGreen",
-          "DeepSkyBlue", "MediumSlateBlue", "MediumTurquoise", "FireBrick",
-          "DarkCyan", "violet", "MediumOrchid", "DarkSalmon", "DarkRed"]
-    
     pyplot.style.use("seaborn-v0_8-dark")
 
     fig = pyplot.figure()
     ax = fig.add_axes([0.1, 0.1, 0.7, 0.75])
 
     #Plot the forecast of attack
-    counter=0
-    d=torch.cat((data[:,index[attack]],forecast[0:1,index[attack]]),dim=0)#connect the past to future in the plot
-    f=forecast[:,index[attack]]
-    c=confidence[:,index[attack]]
-    a=consistent_name(attack)
-    ax.plot(range(len(d)),d,'-', color=colours[counter],label=a,linewidth = 2)
-    ax.plot(range(len(d)-1, (len(d)+len(f))-1),f,'-', color=colours[counter],linewidth=2)
-    ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),f - c, f + c, color=colours[counter], alpha=0.6)
-    f_attack=f.clone()
-    counter+=1
+    counter = 0
+    d = torch.cat((data[:,index[attack]],forecast[0:1,index[attack]]),dim=0)#connect the past to future in the plot
+    f = forecast[:,index[attack]]
+    c = confidence[:,index[attack]]
+    a = consistent_name(attack)
+    ax.plot(range(len(d)), d, '-', color=args.colours[counter%n], label=a, linewidth=2)
+    ax.plot(range(len(d)-1, (len(d)+len(f))-1), f, '-', color=args.colours[counter%n], linewidth=2)
+    ax.fill_between(range(len(d)-1, (len(d)+len(f))-1), f - c, f + c, color=args.colours[counter%n], alpha=0.6)
+    f_attack = f.clone()
+    counter += 1
 
     #remove technologies that we are not worried about in the future
     if alarming:
@@ -213,20 +206,30 @@ def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=T
         f=forecast[:,index[s]]
         c=confidence[:,index[s]]
         s=consistent_name(s)
-        ax.plot(range(len(d)),d,'-', color=colours[counter],label=s,linewidth = 1)
-        ax.plot(range(len(d)-1, (len(d)+len(f))-1),f,'-', color=colours[counter],linewidth=1)
-        ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),f - c, f + c, color=colours[counter], alpha=0.6)
+        ax.plot(range(len(d)),d,'-', color=args.colours[counter%n],label=s,linewidth = 1)
+        ax.plot(range(len(d)-1, (len(d)+len(f))-1),f,'-', color=args.colours[counter%n],linewidth=1)
+        ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),f - c, f + c, color=args.colours[counter%n], alpha=0.6)
         if torch.mean(f_attack) > torch.mean(f):
             cc,cc_conf=getClosestCurveLarger(f,forecast,confidence,attack, solutions, col)#to highlight the gap
-            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc-cc_conf, f+c, color=colours[counter], alpha=0.3)
+            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc-cc_conf, f+c, color=args.colours[counter%n], alpha=0.3)
         else:
             cc,cc_conf=getClosestCurveSmaller(f,forecast,confidence,attack,solutions,col)
-            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc+cc_conf, f-c,  color=colours[counter], alpha=0.3)
+            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc+cc_conf, f-c,  color=args.colours[counter%n], alpha=0.3)
 
         counter+=1  
     
-    x=['2012', '2013','2014', '2015', '2016', '2017', '2018','2019', '2020', '2021','2022','2023','2024','2025','2026']
-    ax.set_xticks([6,18,30,42,54,66,78,90,102,114,126,138,150,162,174], x) # positions of years on x axis
+    # df.index에서 연도 추출
+    years = sorted(list(set(timeindex.year)))
+
+    # 마지막 연도에서 3년 추가
+    last_year = years[-1]
+    future_years = [last_year + i for i in range(1, 4)]
+
+    # 최종 x축 리스트
+    x = [str(y) for y in years + future_years]
+
+    xticks = range(6, 6+12*len(x), 12)
+    ax.set_xticks(xticks, x) # positions of years on x axis
 
     #ax.axvspan(138, 173, color="skyblue", alpha=0.6,  label="Forecast Period")
     ax.set_ylabel("Trend",fontsize=15)
@@ -241,9 +244,8 @@ def plot_forecast(data,forecast,confidence,attack,solutions,index,col,alarming=T
     fig.set_size_inches(10, 7) 
 
     #save and show the forecast
-    images_dir = 'model/Bayesian/forecast/plots/'
-    pyplot.savefig(images_dir+a.replace('/','_')+'.png', bbox_inches="tight")
-    pyplot.savefig(images_dir+a.replace('/','_')+".pdf", bbox_inches = "tight", format='pdf')
+    pyplot.savefig(args.images_dir+a.replace('/','_')+'.png', bbox_inches="tight")
+    pyplot.savefig(args.images_dir+a.replace('/','_')+".pdf", bbox_inches = "tight", format='pdf')
     pyplot.show(block=False)
     pyplot.pause(5)
     pyplot.close()
@@ -257,8 +259,7 @@ def save_data(data, forecast, confidence, variance, col):
         c=confidence[:,i]
         v=variance[:,i]
         name=col[i]
-        file_dir = 'model/Bayesian/forecast/data/'
-        with open(file_dir+name.replace('/','_')+'.txt', 'w') as ff:
+        with open(args.file_dir+name.replace('/','_')+'.txt', 'w') as ff:
             ff.write('Data: '+str(d.tolist())+'\n')
             ff.write('Forecast: '+str(f.tolist())+'\n')
             ff.write('95% Confidence: '+str(c.tolist())+'\n')
@@ -268,19 +269,19 @@ def save_data(data, forecast, confidence, variance, col):
 #saves the forecasted trend's gap between attack and its relevant solutions to a csv file. The gap is for 3 years resulting in 3 values per solution.
 def save_gap(forecast, attack, solutions,index):
     # write the data and forecast
-    with open('model/Bayesian/forecast/gap/'+consistent_name(attack).replace('/','_')+'_gap.csv', 'w', newline='') as file:
+    with open(args.gap_dir+consistent_name(attack).replace('/','_')+'_gap.csv', 'w', newline='') as file:
         writer = csv.writer(file)
         # Write the list as a row
         writer.writerow(['Solution','2023','2024','2025'])
         table=[]
         a=forecast[:,index[attack]].tolist()
-        a_reduced= [sum(a[i:i+12]) / 12 for i in range(0, len(a), 12)]#mean of every 12 months
+        a_reduced= [sum(a[i:i+12]) / 12 for i in range(0, len(a), 12)] #mean of every 12 months
         for s in solutions:
             row=[consistent_name(s)]
             f=forecast[:,index[s]].tolist()
-            f_reduced= [sum(f[i:i+12]) / 12 for i in range(0, len(f), 12)]#mean of every 12 months
+            f_reduced= [sum(f[i:i+12]) / 12 for i in range(0, len(f), 12)] #mean of every 12 months
             
-            gap=[x - y for x, y in zip(a_reduced, f_reduced)]#calculate the gap
+            gap=[x - y for x, y in zip(a_reduced, f_reduced)] #calculate the gap
             row.extend(gap)#3 years gap
             table.append(row)
         sorted_table = sorted(table, key=lambda row: sum(row[-3:]))
@@ -365,7 +366,7 @@ if __name__ == '__main__':
     print('data shape:', dat.shape)
 
     #preparing last part of the data to be used for the forecast
-    P=10 #look back
+    P = args.seq_in_len #look back
     X= torch.from_numpy(dat[-P:, :]) #look back 10 months
     X = torch.unsqueeze(X,dim=0)
     X = torch.unsqueeze(X,dim=1)
@@ -373,10 +374,19 @@ if __name__ == '__main__':
     X = X.to(torch.float)
     X = X.to(torch.float).to(device)   # ← 이 줄 추가 수정 (device 로 올리기)
 
-    Data = DataLoaderS(args.data, args.train_ratio, args.valid_ratio, device, args.horizon, args.seq_in_len, args.graph_file, args.normalize, args.seq_out_len)
+    Data = DataLoaderS(
+        args.data, 
+        args.train_ratio, 
+        args.valid_ratio, 
+        device, 
+        args.horizon, 
+        args.seq_in_len, 
+        args.graph_file, 
+        args.normalize, 
+        args.seq_out_len
+    )
     model = load_model(Data)
     model = model.to(device)
-
 
     # Bayesian estimation
     num_runs = 10
@@ -387,7 +397,7 @@ if __name__ == '__main__':
     for _ in range(num_runs):
         with torch.no_grad():
             output = model(X)  
-            y_pred = output[-1, :, :,-1].clone()#36x142
+            y_pred = output[-1, :, :,-1].clone() #36x142
         outputs.append(y_pred)
 
     # Stack the outputs along a new dimension
@@ -416,10 +426,10 @@ if __name__ == '__main__':
 
     #save the data to desk
     dat=torch.from_numpy(dat)
-    save_data(dat,Y,confidence,variance,col)
+    save_data(dat, Y, confidence, variance, col)
 
     #combine data
-    all=torch.cat((dat,Y), dim=0)
+    all=torch.cat((dat, Y), dim=0)
 
     #scale down full data (global normalisation)
     incident_max=-999999999
@@ -427,7 +437,7 @@ if __name__ == '__main__':
 
     for i in range(all.shape[0]):
         for j in range(all.shape[1]):
-            if 'WAR' in col[j] or 'Holiday' in col[j] or j in range(16,32):
+            if 'WAR' in col[j] or 'Holiday' in col[j] or j in range(16, 32):
                 continue
             if 'Mention' in col[j]:
                 if all[i,j]>mention_max:
@@ -436,9 +446,9 @@ if __name__ == '__main__':
                 if all[i,j]>incident_max:
                     incident_max=all[i,j]
 
-    all_n=torch.zeros(all.shape[0],all.shape[1])
-    confidence_n=torch.zeros(confidence.shape[0],confidence.shape[1])
-    u=0
+    all_n = torch.zeros(all.shape[0],all.shape[1])
+    confidence_n = torch.zeros(confidence.shape[0],confidence.shape[1])
+    u = 0
     for i in range(all.shape[0]):
         for j in range(all.shape[1]):
                 if 'Mention' in col[j]:
@@ -457,5 +467,14 @@ if __name__ == '__main__':
 
     #plot all forecasted nodes in the graph as groups of plots. Each plot consists of a single attack and its pertinent technologies
     for attack, solutions in graph.items():
-        plot_forecast(smoothed_dat[:-args.seq_out_len,],smoothed_dat[-args.seq_out_len:,], smoothed_confidence, attack, solutions, index, col)
+        plot_forecast(
+            smoothed_dat[:-args.seq_out_len,], 
+            smoothed_dat[-args.seq_out_len:,], 
+            smoothed_confidence, 
+            attack, 
+            solutions, 
+            timeindex,
+            index, 
+            col
+        )
         save_gap(smoothed_dat[-args.seq_out_len:,], attack, solutions, index) #save gaps of each attack to file
