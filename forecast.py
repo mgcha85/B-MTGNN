@@ -12,6 +12,17 @@ from o_util import DataLoaderS
 
 
 pyplot.rcParams['savefig.dpi'] = 1200
+colours = [
+    "RoyalBlue", "Crimson", "DarkOrange", "MediumPurple", 
+    "MediumVioletRed", "DodgerBlue", "Indigo", "coral", 
+    "hotpink", "DarkMagenta", "SteelBlue", "brown", 
+    "MediumAquamarine", "SlateBlue", "SeaGreen", "MediumSpringGreen", 
+    "DarkOliveGreen", "Teal", "OliveDrab", "MediumSeaGreen",
+    "DeepSkyBlue", "MediumSlateBlue", "MediumTurquoise", "FireBrick",
+    "DarkCyan", "violet", "MediumOrchid", "DarkSalmon", "DarkRed"
+]
+
+
 
 def load_model(Data):
     with safe_open(args.o_save, framework="pt", device="cpu") as f:
@@ -173,7 +184,7 @@ def zero_negative_curves(data, forecast, attack, solutions):
 #plots forecast of attack and relevant solutions trends. If alarming is set to True, plots the solutions trend forecasted to be less than the attack trend.
 def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, index, col, alarming=True):
     data, forecast= zero_negative_curves(data, forecast, attack, solutions)
-    n = len(args.colours)
+    n = len(colours)
 
     pyplot.style.use("seaborn-v0_8-dark")
 
@@ -186,9 +197,9 @@ def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, inde
     f = forecast[:,index[attack]]
     c = confidence[:,index[attack]]
     a = consistent_name(attack)
-    ax.plot(range(len(d)), d, '-', color=args.colours[counter%n], label=a, linewidth=2)
-    ax.plot(range(len(d)-1, (len(d)+len(f))-1), f, '-', color=args.colours[counter%n], linewidth=2)
-    ax.fill_between(range(len(d)-1, (len(d)+len(f))-1), f - c, f + c, color=args.colours[counter%n], alpha=0.6)
+    ax.plot(range(len(d)), d, '-', color=colours[counter%n], label=a, linewidth=2)
+    ax.plot(range(len(d)-1, (len(d)+len(f))-1), f, '-', color=colours[counter%n], linewidth=2)
+    ax.fill_between(range(len(d)-1, (len(d)+len(f))-1), f - c, f + c, color=colours[counter%n], alpha=0.6)
     f_attack = f.clone()
     counter += 1
 
@@ -205,15 +216,15 @@ def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, inde
         f=forecast[:,index[s]]
         c=confidence[:,index[s]]
         s=consistent_name(s)
-        ax.plot(range(len(d)),d,'-', color=args.colours[counter%n],label=s,linewidth = 1)
-        ax.plot(range(len(d)-1, (len(d)+len(f))-1),f,'-', color=args.colours[counter%n],linewidth=1)
-        ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),f - c, f + c, color=args.colours[counter%n], alpha=0.6)
+        ax.plot(range(len(d)),d,'-', color=colours[counter%n],label=s,linewidth = 1)
+        ax.plot(range(len(d)-1, (len(d)+len(f))-1),f,'-', color=colours[counter%n],linewidth=1)
+        ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),f - c, f + c, color=colours[counter%n], alpha=0.6)
         if torch.mean(f_attack) > torch.mean(f):
             cc,cc_conf=getClosestCurveLarger(f,forecast,confidence,attack, solutions, col)#to highlight the gap
-            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc-cc_conf, f+c, color=args.colours[counter%n], alpha=0.3)
+            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc-cc_conf, f+c, color=colours[counter%n], alpha=0.3)
         else:
             cc,cc_conf=getClosestCurveSmaller(f,forecast,confidence,attack,solutions,col)
-            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc+cc_conf, f-c,  color=args.colours[counter%n], alpha=0.3)
+            ax.fill_between(range(len(d)-1, (len(d)+len(f))-1),cc+cc_conf, f-c,  color=colours[counter%n], alpha=0.3)
 
         counter+=1  
     
@@ -342,7 +353,7 @@ if __name__ == '__main__':
     rawdat = df.values
     n, m = rawdat.shape
 
-    timeindex = list(df.index)
+    timeindex = pd.to_datetime(df.index, format="%y-%b")
     col = list(df.columns)
 
     index = {col:i for i, col in enumerate(col)}

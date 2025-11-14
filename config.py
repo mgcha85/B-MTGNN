@@ -73,15 +73,6 @@ class Config:
     file_dir: str = 'model/Bayesian/forecast/data/'
     gap_dir: str = 'model/Bayesian/forecast/gap/'
 
-    colours: List[str] = [
-        "RoyalBlue", "Crimson", "DarkOrange", "MediumPurple", 
-        "MediumVioletRed", "DodgerBlue", "Indigo", "coral", 
-        "hotpink", "DarkMagenta", "SteelBlue", "brown", 
-        "MediumAquamarine", "SlateBlue", "SeaGreen", "MediumSpringGreen", 
-        "DarkOliveGreen", "Teal", "OliveDrab", "MediumSeaGreen",
-        "DeepSkyBlue", "MediumSlateBlue", "MediumTurquoise", "FireBrick",
-        "DarkCyan", "violet", "MediumOrchid", "DarkSalmon", "DarkRed"
-    ]
 
 def _coerce_type(name: str, value: Any, cfg: Config):
     # cfg 필드 타입 기준으로 문자열을 적절히 형변환(특히 CLI override 시)
