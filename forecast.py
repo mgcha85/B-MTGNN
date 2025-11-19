@@ -180,7 +180,56 @@ def zero_negative_curves(data, forecast, attack, solutions):
             if f[i]<0:
                 f[i]=0
     return data, forecast
-           
+
+def extend_months_and_format(dt_index, months=36):
+    """
+    dt_index: pandas.DatetimeIndex (월 단위)
+    months: 추가할 개월 수 (기본 36개월)
+
+    return: yyyy-mm 형식의 문자열 리스트
+    """
+    if not isinstance(dt_index, pd.DatetimeIndex):
+        raise TypeError("dt_index must be a pandas DatetimeIndex")
+
+    # 기존 인덱스의 마지막 날짜
+    last_date = dt_index[-1]
+
+    # 마지막 월 이후로 months 개월 생성
+    new_dates = pd.date_range(
+        start=last_date + pd.offsets.MonthBegin(1),
+        periods=months,
+        freq='MS'
+    )
+
+    # 기존 + 추가 날짜 합치기
+    full_index = dt_index.union(new_dates)
+
+    # yyyy-mm 포맷으로 리스트 변환
+    return full_index.strftime("%Y").tolist()
+
+def distance_to_next_january(dt_index):
+    """
+    dt_index: pandas.DatetimeIndex
+    return: 첫 번째 month 기준으로,
+            다음 해 January(1월)까지의 개월 거리 (int)
+    """
+    if not isinstance(dt_index, pd.DatetimeIndex):
+        raise TypeError("dt_index must be a pandas DatetimeIndex")
+
+    first_month = dt_index[0].month
+
+    # first_month 다음 달부터 시작
+    count = 0
+    month = first_month
+
+    while True:
+        month = month % 12 + 1   # 12 다음은 1로 순환
+        count += 1
+        if month == 1:           # 다음 해 January 도달
+            break
+
+    return count
+
 #plots forecast of attack and relevant solutions trends. If alarming is set to True, plots the solutions trend forecasted to be less than the attack trend.
 def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, index, col, alarming=True):
     data, forecast= zero_negative_curves(data, forecast, attack, solutions)
@@ -229,17 +278,21 @@ def plot_forecast(data, forecast, confidence, attack, solutions, timeindex, inde
         counter+=1  
     
     # df.index에서 연도 추출
-    years = sorted(list(set(timeindex.year)))
 
     # 마지막 연도에서 3년 추가
-    last_year = years[-1]
-    future_years = [last_year + i for i in range(1, 4)]
+    x = extend_months_and_format(timeindex, months=36)
+    offset = distance_to_next_january(timeindex)
+    # years = sorted(list(set(timeindex.year)))
+    # last_year = years[-1]
+    # future_years = [last_year + i for i in range(1, 4)]
 
     # 최종 x축 리스트
-    x = [str(y) for y in years + future_years]
+    # x = [str(y) for y in years + future_years]
 
-    xticks = range(6, 6+12*len(x), 12)
-    ax.set_xticks(xticks, x) # positions of years on x axis
+    xticks = range(len(x))
+    # xticks = range(6, 6+12*len(x), 12)
+    ax.set_xticks(xticks[offset::12]) # every 12 months
+    ax.set_xticklabels(x[offset::12])
 
     #ax.axvspan(138, 173, color="skyblue", alpha=0.6,  label="Forecast Period")
     ax.set_ylabel("Trend",fontsize=15)
