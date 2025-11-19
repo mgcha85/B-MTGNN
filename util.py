@@ -83,7 +83,7 @@ class DataLoaderS(object):
         self.test =  self._batchify(test_set)
 
         self.test_window = torch.from_numpy(self.dat[-(self.out_len+self.P):, :]) 
-        self.test_window_tf = self.timeindex[-(self.out_len+self.P):]
+        self.test_window_tf = self.timeindex[-self.out_len:]
 
     def _batchify(self, idx_set):
         n = len(idx_set) 
